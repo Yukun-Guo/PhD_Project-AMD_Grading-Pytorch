@@ -1,0 +1,51 @@
+# Converted from old_code/config_3d.ini
+
+[Version]
+version = "35.0"
+
+[DataModule]
+data_path = "./data/oct3d"
+label_path = "./data/trainingset.csv"
+data_ext = "*.mat"
+n_class = 4
+image_shape = [128, 224, 224]
+batch_size = 16
+split_ratio = [0.6, 0.2, 0.2]
+use_kfold = false
+kfold = 5
+kfold_validation_ratio = 0.2
+train_augmentation = true
+validation_augmentation = false
+# Acceptable boolean values: True, False, yes, no, on, off (case-insensitive)
+test_augmentation = false
+shuffle = true
+
+[NetModule]
+model_name = "efficientnetb2"
+unet_channels = [64, 128, 256, 512]
+input_shape = "${DataModule:image_shape}"
+out_channels = "${DataModule:n_class}"
+restore_model = false
+batch_size = ""
+epochs = 500
+lr = 0.001
+checkpoint_dir = "./logs/${NetModule:model_name}_v${Version:version}"
+log_dir = "./logs/${NetModule:model_name}_v${Version:version}"
+early_stopping_patience = 7
+early_stopping_monitor = "val_loss"
+early_stopping_mode = "min"
+loss_weights = ""
+weighted_metrics = ""
+run_eagerly = false
+steps_per_execution = 1
+jit_compile = false
+auto_scale_loss = true
+verbose = "auto"
+validation_split = 0.2
+class_weight = ""
+sample_weight = ""
+initial_epoch = 0
+steps_per_epoch = ""
+validation_steps = ""
+validation_batch_size = ""
+validation_freq = 1

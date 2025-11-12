@@ -365,6 +365,14 @@ wheels = [
 ]
 
 [[package]]
+name = "efficientnet-pytorch-3d"
+version = "0.6.3"
+source = { git = "https://github.com/shijianjian/EfficientNet-PyTorch-3D#c13e36455573a55dea2ae4d5d09c85e01e654a7d" }
+dependencies = [
+    { name = "torch" },
+]
+
+[[package]]
 name = "filelock"
 version = "3.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1942,6 +1950,7 @@ name = "pytorchlightning-template"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "efficientnet-pytorch-3d" },
     { name = "lightning" },
     { name = "matplotlib" },
     { name = "natsort" },
@@ -1960,6 +1969,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "efficientnet-pytorch-3d", git = "https://github.com/shijianjian/EfficientNet-PyTorch-3D" },
     { name = "lightning", specifier = ">=2.5.5" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "natsort", specifier = ">=8.4.0" },
