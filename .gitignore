@@ -3,3 +3,4 @@ logs
 .venv
 deployed_model
 data
+CAMVis

@@ -21,7 +21,7 @@ class RandomCrop2D(object):
             constant fill.  default is 0.
         padding_mode (str, optional): Type of padding. Should be: constant,
             edge, reflect or symmetric. Default is constant.
-        sample (dict): {'img': img, 'mask': mask}
+        sample (dict): {'mnv': mnv, 'fluid': fluid, 'ga': ga, 'drusen': drusen, 'label': label}
 
     """
 
@@ -57,12 +57,14 @@ class RandomCrop2D(object):
         return i, j, th, tw
 
     def __call__(self, sample):
-        img, mask = sample["img"], sample["mask"]
+        mnv, fluid, ga, drusen, label = sample["mnv"], sample["fluid"], sample["ga"], sample["drusen"], sample["label"]
         if self.padding is not None:
-            img = np.pad(img, self.padding, self.fill, self.padding_mode)
-            mask = np.pad(mask, self.padding, self.fill, self.padding_mode)
+            mnv = np.pad(mnv, self.padding, self.fill, self.padding_mode)
+            fluid = np.pad(fluid, self.padding, self.fill, self.padding_mode)
+            ga = np.pad(ga, self.padding, self.fill, self.padding_mode)
+            drusen = np.pad(drusen, self.padding, self.fill, self.padding_mode)
         # pad the height if needed
-        size = img.shape[-2:]  # [h, w, d]
+        size = mnv.shape[-2:]  # [h, w]
         pad_h = (
             (
                 int(np.round((self.size[0] - size[0]) / 2)),
@@ -82,23 +84,20 @@ class RandomCrop2D(object):
             else (0, 0)
         )
 
-        img = np.pad(
-            img,
-            ((0, 0), pad_h, pad_w),
-            constant_values=self.fill,
-            mode=self.padding_mode,
-        )
-        mask = np.pad(
-            mask, (pad_h, pad_w), constant_values=self.fill, mode=self.padding_mode
-        )
-        i, j, h, w = self.get_params2d(img, self.size)
+        mnv = np.pad(mnv,((0, 0), pad_h, pad_w),constant_values=self.fill,mode=self.padding_mode)
+        fluid = np.pad(fluid,((0, 0), pad_h, pad_w),constant_values=self.fill,mode=self.padding_mode)
+        ga = np.pad(ga,((0, 0), pad_h, pad_w),constant_values=self.fill,mode=self.padding_mode)
+        drusen = np.pad(drusen,((0, 0), pad_h, pad_w),constant_values=self.fill,mode=self.padding_mode)
+        
+        i, j, h, w = self.get_params2d(mnv, self.size)
 
         # crop the image
-        img = img[:, i: i + h, j: j + w].copy()
-        mask = mask[i: i + h, j: j + w].copy()
+        mnv = mnv[:, i: i + h, j: j + w].copy()
+        fluid = fluid[:, i: i + h, j: j + w].copy()
+        ga = ga[:, i: i + h, j: j + w].copy()
+        drusen = drusen[:, i: i + h, j: j + w].copy()
 
-        return {"img": img, "mask": mask}
-
+        return {"mnv": mnv, "fluid": fluid, "ga": ga, "drusen": drusen, "label": label}
     def __repr__(self):
         return self.__class__.__name__ + "(size={0}, padding={1})".format(
             self.size, self.padding
@@ -236,7 +235,7 @@ class GrayJitter(object):
         bright_range (tuple): range of brightness change.
         contrast_range (tuple): range of contrast change.
         max_value (int): max value of the image.
-        sample (dict): {'img': img, 'mask': mask}
+        sample (dict): {'mnv': mnv, 'fluid': fluid, 'ga': ga, 'drusen': drusen, 'label': label,'fname': filename}
     """
 
     def __init__(self, bright_range=(0, 40), contrast_range=(0.5, 1.5), max_value=255):
@@ -245,18 +244,29 @@ class GrayJitter(object):
         self.max_value = max_value
 
     def __call__(self, sample):
-        img, mask = sample["img"], sample["mask"]
+        mnv, fluid, ga, drusen, label = sample["mnv"], sample["fluid"], sample["ga"], sample["drusen"], sample["label"]
         bright_scale = np.random.uniform(
             self.bright_range[0], self.bright_range[1])
         contrast_scale = np.random.uniform(
             self.contrast_range[0], self.contrast_range[1]
         )
-        meanv = np.mean(img)
-        img = (img - meanv) * contrast_scale + meanv
-        img = img + bright_scale
-        img = np.clip(img, 0, self.max_value)
-        return {"img": img, "mask": mask}
-
+        meanv = np.mean(mnv)
+        mnv = (mnv - meanv) * contrast_scale + meanv
+        mnv = mnv + bright_scale
+        mnv = np.clip(mnv, 0, self.max_value)
+        meanv = np.mean(fluid)
+        fluid = (fluid - meanv) * contrast_scale + meanv
+        fluid = fluid + bright_scale
+        fluid = np.clip(fluid, 0, self.max_value)
+        meanv = np.mean(ga)
+        ga = (ga - meanv) * contrast_scale + meanv
+        ga = ga + bright_scale
+        ga = np.clip(ga, 0, self.max_value)
+        meanv = np.mean(drusen)
+        drusen = (drusen - meanv) * contrast_scale + meanv
+        drusen = drusen + bright_scale
+        drusen = np.clip(drusen, 0, self.max_value)
+        return {"mnv": mnv, "fluid": fluid, "ga": ga, "drusen": drusen, "label": label}
     def __repr__(self):
         return (
             self.__class__.__name__
@@ -316,7 +326,7 @@ class RandomFlip(object):
     Args:
         p (float): probability of the image being flipped. Default value is 0.5
         axis (int): axis to flip. 0 for vertical flip, 1 for horizontal flip. Default value is 0.
-        sample (dict): {'img': img, 'mask': mask}
+        sample (dict): {'mnv': mnv, 'fluid': fluid, 'ga': ga, 'drusen': drusen, 'label': label}
     """
 
     def __init__(self, p=0.5, axis=0):
@@ -324,12 +334,13 @@ class RandomFlip(object):
         self.axis = axis
 
     def __call__(self, sample):
-        image, mask = sample["img"], sample["mask"]
+        mnv, fluid, ga, drusen, label = sample["mnv"], sample["fluid"], sample["ga"], sample["drusen"], sample["label"]
         if np.random.random() < self.p:
-            image = np.flip(image, axis=self.axis+1)
-            mask = np.flip(mask, axis=self.axis)
-        return {"img": image, "mask": mask}
-
+            mnv = np.flip(mnv, axis=self.axis+1)
+            fluid = np.flip(fluid, axis=self.axis+1)
+            ga = np.flip(ga, axis=self.axis+1)
+            drusen = np.flip(drusen, axis=self.axis+1)
+        return {"mnv": mnv, "fluid": fluid, "ga": ga, "drusen": drusen, "label": label}
 
 if __name__ == "__main__":
     img = np.random.randint(0, 255, (1, 128, 128, 128))

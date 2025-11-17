@@ -1,7 +1,7 @@
 # Converted from old_code/config_3d.ini
 
 [Version]
-version = "35.0"
+version = "1.0"
 
 [DataModule]
 data_path = "./data/oct3d"
@@ -29,8 +29,8 @@ restore_model = false
 batch_size = ""
 epochs = 500
 lr = 0.001
-checkpoint_dir = "./logs/${NetModule:model_name}_v${Version:version}"
-log_dir = "./logs/${NetModule:model_name}_v${Version:version}"
+checkpoint_dir = "./logs/3d/"
+log_dir = "./logs/3d/"
 early_stopping_patience = 7
 early_stopping_monitor = "val_loss"
 early_stopping_mode = "min"

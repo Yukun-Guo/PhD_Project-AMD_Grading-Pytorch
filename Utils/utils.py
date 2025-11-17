@@ -5,7 +5,30 @@ import glob
 import os
 from tqdm import tqdm
 import natsort
+import csv
 
+def read_csv_file(csv_file):
+    """
+    Read a csv file and return the data as a list of dictionaries.
+    :param csv_file: The path to the csv file.
+    :return: A list of dictionaries, where each dictionary represents a row in the csv file.
+    """
+    with open(csv_file, 'r',encoding='utf-8-sig') as f:
+        reader = csv.DictReader(f)
+        data = [row for row in reader]
+    return data
+
+def write_csv_file(csv_file, data:list):
+    """
+    Write a list of dictionaries to a csv file.
+    :param csv_file: The path to the csv file.
+    :param data: A list of dictionaries, where each dictionary represents a row in the csv file.
+    """
+    with open(csv_file, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=data[0].keys())
+        writer.writeheader()
+        writer.writerows(data)
+        
 def read_file_list(list_txt_file):
     fp = open(list_txt_file, 'r')
     files = fp.readlines()
@@ -131,6 +154,28 @@ def read_img_list_to_npy(file_list, color_mode, shuffle=False):
         npy_data.append(im)
     return npy_data
 
+def read_image(image_file_name, mode=None):
+    """
+     Read image from file.
+    :param image_file_name: full file path
+    :param mode: 'gray', 'rgb' or 'idx'
+    :return: numpy image
+    """
+    img = Image.open(image_file_name.rstrip())
+    dty = 'float32'
+    if mode is not None:
+        if mode.lower() == 'gray':
+            img = img.convert('L')
+            dty = 'float32'
+        else:
+            if mode.lower() == 'rgb':
+                img = img.convert('RGB')
+                dty = 'float32'
+            else:
+                if mode.lower() == 'idx':
+                    img = img.convert('P')
+                    dty = 'int64'
+    return np.asarray(img, dtype=dty)
 
 def split_dataset_npy(npy_file,
                       split_ratio=(0.8, 0.2, 0),

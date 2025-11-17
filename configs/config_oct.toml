@@ -6,30 +6,27 @@ version = "9.0"
 [DataModule]
 data_path = "./data/img_oct"
 label_path = "./data/trainingset.csv"
-data_ext = "*__diff.png"
+data_ext = "*_mnv.png"
 n_class = 4
 image_shape = [304, 304, 1]
 batch_size = 8
-split_ratio = [0.6, 0.2, 0.2]
+split_ratio = [0.6, 0.2, 0.2] # train, val, test
 use_kfold = false
-kfold = 5
-kfold_validation_ratio = 0.2
+k_fold = 5
+k_fold_validation_ratio = 0.2
 train_augmentation = true
 validation_augmentation = false
 test_augmentation = false
 shuffle = true
 
 [NetModule]
-model_name = "PlainModel_oct"
+model_name = "efficientnet_b5"
 unet_channels = [64, 128, 256, 512]
-input_shape = "${DataModule:image_shape}"
-out_channels = "${DataModule:n_class}"
 restore_model = false
-batch_size = ""
 epochs = 500
 lr = 0.001
-checkpoint_dir = "./logs/${NetModule:model_name}_v${Version:version}"
-log_dir = "./logs/${NetModule:model_name}_v${Version:version}"
+checkpoint_dir = "./logs/oct/"
+log_dir = "./logs/oct/"
 early_stopping_patience = 7
 early_stopping_monitor = "val_loss"
 early_stopping_mode = "min"
