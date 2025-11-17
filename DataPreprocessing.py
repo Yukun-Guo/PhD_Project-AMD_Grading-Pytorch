@@ -17,9 +17,69 @@ from torchvision import transforms
 from tqdm import tqdm
 from typing import List, Tuple, Dict, Any, Union
 
-from Utils.utils import shuffle_lists, listFiles, read_image,read_csv_file, split_list
-from Utils.DataAugmentation import GrayJitter, RandomCrop2D, RandomFlip
+from Utils.utils import shuffle_lists, listFiles, read_image,read_csv_file, split_list,read_mat
+from Utils.DataAugmentation import GrayJitter, RandomCrop3D, RandomFlip3D, RandomCrop2D, RandomFlip
 
+
+class myDataset_mat(Dataset):
+    """
+    Custom Dataset class for image classification tasks.
+    """
+
+    def __init__(self, mat_list: List[str],label_list: List[int], out_size: Tuple[int, int],data_type= "3d"):
+        """
+        Initialize the dataset with image and mask file lists.
+        
+        Args:
+            img_list (list): List of paths to input images
+            gt_list (list): List of paths to ground truth masks
+            out_size (tuple): Target output size (height, width)
+            shuffle (bool): Whether to shuffle the data pairs
+        """
+    
+        self.mat_list = mat_list
+        self.labels = label_list
+        
+        self.transform = transforms.Compose([
+            # GrayJitter(),
+            RandomFlip3D(axis=1),
+            RandomCrop3D(out_size),
+            Normalize3D(data_type="3d"),
+            ToTensor3D()
+        ])
+    def __len__(self) -> int:
+        """
+        Get the number of samples in the dataset.
+        
+        Returns:
+            int: Number of image-mask pairs in the dataset
+        """
+        return len(self.mat_list)
+    
+    def __getitem__(self, item: Union[int, torch.Tensor]):
+        """
+        Get a single sample from the dataset.
+        
+        Args:
+            item (int or torch.Tensor): Index of the sample to retrieve
+        
+        Returns:
+            tuple: (image_tensor, mask_tensor) where:
+                - image_tensor: Preprocessed image tensor of shape (C, H, W)
+                - mask_tensor: Ground truth mask tensor of shape (H, W)
+        """
+        if torch.is_tensor(item):
+            item = item.tolist()
+
+        mat = read_mat(self.mat_list[item], img_tag='imgMat')
+        label = self.labels[item]
+
+        mat = np.expand_dims(mat, axis=0)
+
+        sample = {'mat': mat, 'label': label}
+        sample = self.transform(sample)
+        
+        return sample['mat'], sample['label'], self.mat_list[item]
 
 class myDataset_img(Dataset):
     """
@@ -183,6 +243,54 @@ class Normalize(object):
         """Return string representation of the transform."""
         return self.__class__.__name__
 
+
+class Normalize3D(object):
+    """
+    Normalize image pixel values from [0, 255] to [0, 1] range.
+    
+    This transform converts uint8 pixel values to float32 values in the [0, 1] range
+    by dividing by 255. The mask values are left unchanged as they represent
+    class indices.
+    
+    Args:
+        inplace (bool, optional): Whether to perform normalization in-place.
+            Defaults to False.
+    
+    Example:
+        >>> normalize = Normalize()
+        >>> sample = {'img': np.array([0, 128, 255]), 'mask': np.array([0, 1, 2])}
+        >>> normalized = normalize(sample)
+        >>> print(normalized['img'])  # [0.0, 0.502, 1.0]
+    """
+
+    def __init__(self, inplace: bool = False,data_type='oct'):
+        """
+        Initialize the Normalize transform.
+        
+        Args:
+            inplace (bool): Whether to perform normalization in-place
+        """
+        self.inplace = inplace
+        self.data_type = data_type
+
+    def __call__(self, sample: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        """
+        Apply normalization to the sample.
+        
+        Args:
+            sample (dict): Dictionary containing 'img' and 'mask' arrays
+        
+        Returns:
+            dict: Dictionary with normalized image and original mask
+        """
+        mat, label = sample['mat'], sample['label']
+        mat = mat / 255.0  # Normalize to [0, 1]
+        return {'mat': mat, 'label': label}
+
+    def __repr__(self) -> str:
+        """Return string representation of the transform."""
+        return self.__class__.__name__
+
 class ToTensor(object):
     """
     Convert numpy arrays to PyTorch tensors.
@@ -234,42 +342,72 @@ class ToTensor(object):
         #     label = torch.from_numpy(label.astype(np.int64))
 
         return {'mnv': mnv, 'fluid': fluid, 'ga': ga, 'drusen': drusen, 'label': label}
+    
+class ToTensor3D(object):
+    """
+    Convert numpy arrays to PyTorch tensors.
+    
+    This transform converts numpy arrays to PyTorch tensors with appropriate
+    data types:
+    - Images: Converted to FloatTensor (for gradient computation)
+    - Masks: Converted to LongTensor (for class indices)
+    
+    The transform maintains the array dimensions and does not change the
+    data layout (assumes images are already in C x H x W format).
+    
+    Example:
+        >>> to_tensor = ToTensor()
+        >>> sample = {
+        ...     'img': np.random.rand(1, 256, 256).astype(np.float32),
+        ...     'mask': np.random.randint(0, 4, (256, 256)).astype(np.int64)
+        ... }
+        >>> tensor_sample = to_tensor(sample)
+        >>> print(type(tensor_sample['img']))  # <class 'torch.Tensor'>
+    """
+
+    def __call__(self, sample: Dict[str, np.ndarray]) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Convert sample arrays to tensors.
+        
+        Args:
+            sample (dict): Dictionary containing 'img' and 'mask' numpy arrays
+        
+        Returns:
+            dict: Dictionary with tensor versions of image and mask
+        """
+        mat, label = sample['mat'], sample['label']
+        
+        # Convert to tensors with appropriate dtypes
+        if not torch.is_tensor(mat):
+            mat = torch.from_numpy(mat.astype(np.float32))
+        return {'mat': mat, 'label': label}
 
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from torchvision.utils import make_grid
     import toml
-    config = toml.load("configs/config_oct.toml")
+    config = toml.load("configs/config_3d.toml")
     image_path = config['DataModule']["data_path"]
     label_path = config['DataModule']["label_path"]
-    
+    img_shape = config['DataModule']["image_shape"]
     data_csv = read_csv_file(label_path)
-    mnv_list = [os.path.join(image_path, row['caseID'] + '_mnv.png') for row in data_csv]
-    fluid_list =  [fn.replace("_mnv", "_fluid") for fn in mnv_list]
-    ga_list = [fn.replace("_mnv", "_ga") for fn in mnv_list]
-    drusen_list = [fn.replace("_mnv", "_drusen") for fn in mnv_list]
+    mat_list = [os.path.join(image_path, row['caseID'] + '.mat') for row in data_csv]
     label_list = [int(row['label']) for row in data_csv]
     
 
-    if len(mnv_list) != len(label_list):
-        raise ValueError(f"Mismatch: {len(mnv_list)} images vs {len(label_list)} labels")
+    if len(mat_list) != len(label_list):
+        raise ValueError(f"Mismatch: {len(mat_list)} images vs {len(label_list)} labels")
     
     train_list, test_list, valid_list = split_list(
         list(range(len(label_list))), split=config['DataModule']["split_ratio"]
     )
         
-    dataset = myDataset_img(mnv_list, fluid_list, ga_list, drusen_list, label_list, out_size=(304,304),data_type= "oct")
-    dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
+    dataset = myDataset_mat(mat_list, label_list, out_size=img_shape, data_type="3d")
+    dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
     print(len(dataloader))
 
-    for mnv,fluid,ga,drusen,label,fname in dataloader:
-        print(mnv[0].shape)
-        print(fluid[0].shape)
+    for mat, label, fname in dataloader:
+        print(mat[0].shape)
         print(fname[0], label[0])
-        bscan = make_grid(torch.cat([mnv, mnv, mnv], dim=1)).permute(1, 2, 0)
-        plt.figure()
-        plt.subplot(1, 3, 1), plt.imshow(bscan.numpy())
-        plt.subplot(1, 3, 2), plt.imshow(np.squeeze(fluid[0].numpy()))
-        plt.subplot(1, 3, 3), plt.imshow(np.squeeze(ga[0].numpy()))
-        plt.show()
+        print(torch.min(mat), torch.max(mat))

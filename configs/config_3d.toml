@@ -8,12 +8,12 @@ data_path = "./data/oct3d"
 label_path = "./data/trainingset.csv"
 data_ext = "*.mat"
 n_class = 4
-image_shape = [128, 224, 224]
+image_shape = [192, 256, 256]
 batch_size = 16
 split_ratio = [0.6, 0.2, 0.2]
 use_kfold = false
-kfold = 5
-kfold_validation_ratio = 0.2
+k_fold = 5
+k_fold_validation_ratio = 0.2
 train_augmentation = true
 validation_augmentation = false
 # Acceptable boolean values: True, False, yes, no, on, off (case-insensitive)
@@ -22,6 +22,7 @@ shuffle = true
 
 [NetModule]
 model_name = "efficientnetb2"
+backbone_name = "efficientnet_b2"
 unet_channels = [64, 128, 256, 512]
 input_shape = "${DataModule:image_shape}"
 out_channels = "${DataModule:n_class}"

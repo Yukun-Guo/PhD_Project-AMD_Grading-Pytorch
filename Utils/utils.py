@@ -88,6 +88,10 @@ def shuffle_lists(*file_lists):
         np.random.shuffle(list_files)
         return zip(*list_files)
 
+def read_mat(mat_file, img_tag='imgMat'):
+    mat = sio.loadmat(mat_file)
+    img = np.array(mat[img_tag], dtype='float32')
+    return img
 
 def read_mat_list_to_npy2d(file_list, shuffle=True):
     npy_data = []

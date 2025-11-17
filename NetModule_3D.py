@@ -80,16 +80,15 @@ class NetModule(L.LightningModule):
 
         self.save_hyperparameters()
         
-        self.input_size = config['DataModule']['image_shape'][:2]
-        self.img_chn = config['DataModule']['image_shape'][2]
+        # For 3D data: image_shape = [Depth, Height, Width]
+        self.input_size_3d = config['DataModule']['image_shape']  # [D, H, W]
+        self.img_chn = 1  # OCT data is typically single channel (grayscale)
         self.n_class = config['DataModule']['n_class']
         self.lr = config['NetModule']['lr']
         self.backbone_name = config['NetModule'].get('backbone_name', 'efficientnet_b0')
-        self.example_input_array = [torch.randn((1, self.img_chn, *self.input_size)),
-                                    torch.randn((1, self.img_chn, *self.input_size)),
-                                    torch.randn((1, self.img_chn, *self.input_size)),
-                                    torch.randn((1, self.img_chn, *self.input_size))]
-        self.out = self._build_2d_model(
+        # Create example input for 3D: [Batch, Channel, Depth, Height, Width]
+        self.example_input_array = torch.randn((1, self.img_chn, *self.input_size_3d))
+        self.out = self._build_3d_model(
             backbone_name=self.backbone_name,
             in_channels=self.img_chn,
             out_channels=self.n_class,
@@ -102,7 +101,7 @@ class NetModule(L.LightningModule):
         self.valid_dataset = None
         self.train_dataset = None
    
-    def _build_2d_model(self, backbone_name: str = 'efficientnet_b5', in_channels: Optional[int] = None, out_channels: Optional[int] = None, out_activation=None):
+    def _build_3d_model(self, backbone_name: str = 'efficientnet_b2', in_channels: Optional[int] = None, out_channels: Optional[int] = None, out_activation=None):
         """Build a simplified 2D classification head (single head, 4-class).
 
         The module accepts a list/tuple of four image tensors ([B, C, H, W]) and
@@ -117,94 +116,66 @@ class NetModule(L.LightningModule):
         class Classifier(nn.Module):
             def __init__(self, in_channels, num_classes, backbone_name='efficientnet_b0'):
                 super().__init__()
-                # map input channels to 3 if needed
-                self.to3 = nn.Conv2d(in_channels, 3, kernel_size=1) if in_channels != 3 else nn.Identity()
-                self.pool = nn.AdaptiveAvgPool2d(1)
+                self.pool = nn.AdaptiveAvgPool3d(1)  # Use 3D pooling for 3D input
                 if backbone_name == 'efficientnet_b0':
-                    backbone1 = models.efficientnet_b0(weights=None)
-                    backbone2 = models.efficientnet_b0(weights=None)
-                    backbone3 = models.efficientnet_b0(weights=None)
-                    backbone4 = models.efficientnet_b0(weights=None)
+                    backbone1 = EfficientNet3D.from_name('efficientnet-b0', in_channels=in_channels)
                 elif backbone_name == 'efficientnet_b1':
-                    backbone1 = models.efficientnet_b1(weights=None)
-                    backbone2 = models.efficientnet_b1(weights=None)
-                    backbone3 = models.efficientnet_b1(weights=None)
-                    backbone4 = models.efficientnet_b1(weights=None)
+                    backbone1 = EfficientNet3D.from_name('efficientnet-b1', in_channels=in_channels)
                 elif backbone_name == 'efficientnet_b2':
-                    backbone1 = models.efficientnet_b2(weights=None)
-                    backbone2 = models.efficientnet_b2(weights=None)
-                    backbone3 = models.efficientnet_b2(weights=None)
-                    backbone4 = models.efficientnet_b2(weights=None)
+                    backbone1 = EfficientNet3D.from_name('efficientnet-b2', in_channels=in_channels)
                 elif backbone_name == 'efficientnet_b3':
-                    backbone1 = models.efficientnet_b3(weights=None)
-                    backbone2 = models.efficientnet_b3(weights=None)
-                    backbone3 = models.efficientnet_b3(weights=None)
-                    backbone4 = models.efficientnet_b3(weights=None)
+                    backbone1 = EfficientNet3D.from_name('efficientnet-b3', in_channels=in_channels)
                 elif backbone_name == 'efficientnet_b4':
-                    backbone1 = models.efficientnet_b4(weights=None)
-                    backbone2 = models.efficientnet_b4(weights=None)
-                    backbone3 = models.efficientnet_b4(weights=None)
-                    backbone4 = models.efficientnet_b4(weights=None)
-                elif backbone_name == 'efficientnet_b5':
-                    backbone1 = models.efficientnet_b5(weights=None)
-                    backbone2 = models.efficientnet_b5(weights=None)
-                    backbone3 = models.efficientnet_b5(weights=None)
-                    backbone4 = models.efficientnet_b5(weights=None)
-                elif backbone_name == 'efficientnet_b6':
-                    backbone1 = models.efficientnet_b6(weights=None)
-                    backbone2 = models.efficientnet_b6(weights=None)
-                    backbone3 = models.efficientnet_b6(weights=None)
-                    backbone4 = models.efficientnet_b6(weights=None)
-                elif backbone_name == 'efficientnet_b7':
-                    backbone1 = models.efficientnet_b7(weights=None)
-                    backbone2 = models.efficientnet_b7(weights=None)
-                    backbone3 = models.efficientnet_b7(weights=None)
-                    backbone4 = models.efficientnet_b7(weights=None)
+                    backbone1 = EfficientNet3D.from_name('efficientnet-b4', in_channels=in_channels)
                 else:
                     raise ValueError(f'Unsupported backbone: {backbone_name}')
 
-                self.backbone1 = backbone1.features
-                self.backbone2 = backbone2.features
-                self.backbone3 = backbone3.features
-                self.backbone4 = backbone4.features
-                feat_dim = 1280
+                self.backbone1 = backbone1
+
+                # Get the feature dimension from the backbone
+                # For EfficientNet-B0 to B4, the final feature dimensions are:
+                # B0: 1280, B1: 1280, B2: 1408, B3: 1536, B4: 1792
+                if 'b0' in backbone_name or 'b1' in backbone_name:
+                    feat_dim = 1280
+                elif 'b2' in backbone_name:
+                    feat_dim = 1408
+                elif 'b3' in backbone_name:
+                    feat_dim = 1536
+                elif 'b4' in backbone_name:
+                    feat_dim = 1792
+                else:
+                    feat_dim = 1280  # default
 
                 self.classifier = nn.Sequential(
-                    nn.Linear(feat_dim * 4, 512),
+                    nn.Linear(feat_dim, 512),  # Only one backbone, so no multiplication by 4
                     nn.ReLU(inplace=True),
                     nn.Dropout(0.3),
                     nn.Linear(512, num_classes)
                 )
 
-            def forward(self, inputs):                
-                if not isinstance(inputs, (list, tuple)):
-                    raise ValueError('TwoDClassifier expects a list/tuple of 4 input tensors')
-                feats = []
-                feats.append(self.pool(self.backbone1(self.to3(inputs[0]))).view(inputs[0].size(0), -1))
-                feats.append(self.pool(self.backbone2(self.to3(inputs[1]))).view(inputs[1].size(0), -1))
-                feats.append(self.pool(self.backbone3(self.to3(inputs[2]))).view(inputs[2].size(0), -1))
-                feats.append(self.pool(self.backbone4(self.to3(inputs[3]))).view(inputs[3].size(0), -1))
-                y = torch.cat(feats, dim=1)
-                logits = self.classifier(y)
+            def forward(self, input):                
+                # Extract features using the 3D backbone (not the full model)
+                features = self.backbone1.extract_features(input)  # [B, feat_dim, D', H', W']
+                pooled_features = self.pool(features)  # [B, feat_dim, 1, 1, 1]
+                flattened_features = pooled_features.view(input.size(0), -1)  # [B, feat_dim]
+                
+                logits = self.classifier(flattened_features)
                 return logits
 
         return Classifier(in_ch, out_ch,backbone_name)
     
-    def forward(self, mnv: torch.Tensor, fluid: torch.Tensor, ga: torch.Tensor, drusen: torch.Tensor) -> torch.Tensor:
+    def forward(self, mat: torch.Tensor) -> torch.Tensor:
         """Forward pass accepting 4 separate image tensors for the classifier.
         
         Args:
-            mnv (torch.Tensor): MNV image tensor [B, C, H, W]
-            fluid (torch.Tensor): Fluid image tensor [B, C, H, W]  
-            ga (torch.Tensor): GA image tensor [B, C, H, W]
-            drusen (torch.Tensor): Drusen image tensor [B, C, H, W]
+            mat (torch.Tensor): Image tensor [B, C, D, H, W]
             
         Returns:
             torch.Tensor: Classification logits [B, num_classes]
         """
-        return self.out([mnv, fluid, ga, drusen])
+        return self.out(mat)
     
-    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor,str], batch_idx: int) -> Dict[str, torch.Tensor]:
+    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor,str], batch_idx: int) -> Dict[str, torch.Tensor]:
         """
         Training step for one batch.
         
@@ -217,17 +188,17 @@ class NetModule(L.LightningModule):
         Returns:
             dict: Dictionary containing the computed loss
         """
-        mnv, fluid, ga, drusen, y, _ = batch
-        y_hat = self.forward(mnv, fluid, ga, drusen)
+        mat, y, _ = batch
+        y_hat = self.forward(mat)
         
         train_loss = F.cross_entropy(y_hat, y)
         y_hat_argmax = torch.argmax(y_hat, dim=1)
         # train_f1 = FM.f1_score(y_hat_argmax, y, average='macro', num_classes=self.n_class,task='multiclass')
         train_acc = FM.accuracy(y_hat_argmax, y, num_classes=self.n_class,task='multiclass')
         
-        # self.log("train_f1", train_f1, on_epoch=True, prog_bar=True, logger=True)
-        self.log("train_loss", train_loss, on_epoch=True, prog_bar=True, logger=True)
-        self.log("train_acc", train_acc, on_epoch=True, prog_bar=True, logger=True)
+        # self.log("train_f1", train_f1, on_epoch=True, prog_bar=True, logger=True, batch_size=mat.size(0))
+        self.log("train_loss", train_loss, on_epoch=True, prog_bar=True, logger=True, batch_size=mat.size(0))
+        self.log("train_acc", train_acc, on_epoch=True, prog_bar=True, logger=True, batch_size=mat.size(0))
 
         return {'loss': train_loss}
 
@@ -242,15 +213,15 @@ class NetModule(L.LightningModule):
             batch (tuple): Batch containing (images, masks) tensors
             batch_idx (int): Index of the current batch
         """
-        mnv, fluid, ga, drusen, y, _ = batch
-        y_hat = self.forward(mnv, fluid, ga, drusen)        
+        mat, y, _ = batch
+        y_hat = self.forward(mat)        
         # Validation loss
         val_loss = F.cross_entropy(y_hat, y)
         y_hat_argmax = torch.argmax(y_hat, dim=1)
         # val_f1 = FM.f1_score(y_hat_argmax, y, average='macro', num_classes=self.n_class,task='multiclass')
         val_acc = FM.accuracy(y_hat_argmax, y, num_classes=self.n_class,task='multiclass')
         cur_lr = self.trainer.optimizers[0].param_groups[0]['lr']
-        self.log_dict({'val_loss': val_loss, 'val_acc': val_acc, 'lr': cur_lr}, prog_bar=True, logger=True)
+        self.log_dict({'val_loss': val_loss, 'val_acc': val_acc, 'lr': cur_lr}, prog_bar=True, logger=True, batch_size=mat.size(0))
 
     def configure_optimizers(self) -> Tuple[List[torch.optim.Optimizer], List[Dict[str, Any]]]:
         """
@@ -327,7 +298,9 @@ class NetModule(L.LightningModule):
         detailed information about model layers, parameters, and memory usage.
         """
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        summary(self.to(device), tuple(self.example_input_array[0].shape[1:]))
+        # For 3D input: [Channel, Depth, Height, Width]
+        input_size = (self.img_chn, *self.input_size_3d)
+        summary(self.to(device), input_size)
 
     def create_grad_cam_visualizer(self, use_cuda: bool = True, method: str = 'gradcam',
                                   n_samples: int = 50, noise_level: float = 0.15) -> Any:
@@ -366,8 +339,7 @@ class NetModule(L.LightningModule):
         """
         return ComparisonVisualizer(self, use_cuda)
     
-    def analyze_prediction_with_gradcam(self, mnv: torch.Tensor, fluid: torch.Tensor, 
-                                      ga: torch.Tensor, drusen: torch.Tensor,
+    def analyze_prediction_with_gradcam(self, mat: torch.Tensor,
                                       target_class: Optional[int] = None,
                                       save_dir: Optional[str] = None,
                                       sample_id: str = "sample") -> Dict[str, Any]:
@@ -392,7 +364,7 @@ class NetModule(L.LightningModule):
         
         # Make prediction
         with torch.no_grad():
-            logits = self.forward(mnv, fluid, ga, drusen)
+            logits = self.forward(mat)
             probabilities = F.softmax(logits, dim=1)
             predicted_class = int(logits.argmax(dim=1).item())
             confidence = float(probabilities[0, predicted_class].item())
@@ -401,7 +373,7 @@ class NetModule(L.LightningModule):
         visualizer = self.create_grad_cam_visualizer()
         
         # Generate heatmaps
-        inputs = [mnv, fluid, ga, drusen]
+        inputs = [mat]
         analysis_target = target_class if target_class is not None else predicted_class
         
         save_path = Path(save_dir) if save_dir else None
@@ -419,8 +391,7 @@ class NetModule(L.LightningModule):
             'sample_id': sample_id
         }
     
-    def analyze_prediction_with_gradcam_plus_plus(self, mnv: torch.Tensor, fluid: torch.Tensor, 
-                                                 ga: torch.Tensor, drusen: torch.Tensor,
+    def analyze_prediction_with_gradcam_plus_plus(self, mat: torch.Tensor,
                                                  target_class: Optional[int] = None,
                                                  save_dir: Optional[str] = None,
                                                  sample_id: str = "sample") -> Dict[str, Any]:
@@ -428,10 +399,7 @@ class NetModule(L.LightningModule):
         Analyze a prediction using Grad-CAM++ to show important regions.
         
         Args:
-            mnv: MNV image tensor [B, C, H, W]
-            fluid: Fluid image tensor [B, C, H, W]
-            ga: GA image tensor [B, C, H, W] 
-            drusen: Drusen image tensor [B, C, H, W]
+            mat:  image tensor [B, C, D, H, W]
             target_class: Target class for analysis. If None, uses predicted class
             save_dir: Directory to save visualizations
             sample_id: Identifier for this sample
@@ -445,7 +413,7 @@ class NetModule(L.LightningModule):
         
         # Make prediction
         with torch.no_grad():
-            logits = self.forward(mnv, fluid, ga, drusen)
+            logits = self.forward(mat)
             probabilities = F.softmax(logits, dim=1)
             predicted_class = int(logits.argmax(dim=1).item())
             confidence = float(probabilities[0, predicted_class].item())
@@ -454,7 +422,7 @@ class NetModule(L.LightningModule):
         visualizer = self.create_grad_cam_visualizer(use_cuda=True, method='gradcam++')
         
         # Generate heatmaps
-        inputs = [mnv, fluid, ga, drusen]
+        inputs = [mat]
         analysis_target = target_class if target_class is not None else predicted_class
         
         save_path = Path(save_dir) if save_dir else None
@@ -473,8 +441,7 @@ class NetModule(L.LightningModule):
             'method': 'gradcam++'
         }
     
-    def compare_gradcam_methods(self, mnv: torch.Tensor, fluid: torch.Tensor, 
-                               ga: torch.Tensor, drusen: torch.Tensor,
+    def compare_gradcam_methods(self, mat: torch.Tensor, 
                                target_class: Optional[int] = None,
                                save_dir: Optional[str] = None,
                                sample_id: str = "sample") -> Dict[str, Any]:
@@ -482,10 +449,7 @@ class NetModule(L.LightningModule):
         Compare Grad-CAM and Grad-CAM++ methods side by side.
         
         Args:
-            mnv: MNV image tensor [B, C, H, W]
-            fluid: Fluid image tensor [B, C, H, W]
-            ga: GA image tensor [B, C, H, W] 
-            drusen: Drusen image tensor [B, C, H, W]
+            mat:  image tensor [B, C, D, H, W]
             target_class: Target class for analysis. If None, uses predicted class
             save_dir: Directory to save visualizations
             sample_id: Identifier for this sample
@@ -499,7 +463,7 @@ class NetModule(L.LightningModule):
         
         # Make prediction
         with torch.no_grad():
-            logits = self.forward(mnv, fluid, ga, drusen)
+            logits = self.forward(mat)
             probabilities = F.softmax(logits, dim=1)
             predicted_class = int(logits.argmax(dim=1).item())
             confidence = float(probabilities[0, predicted_class].item())
@@ -508,7 +472,7 @@ class NetModule(L.LightningModule):
         visualizer = self.create_comparison_visualizer()
         
         # Generate comparison analysis
-        inputs = [mnv, fluid, ga, drusen]
+        inputs = [mat]
         analysis_target = target_class if target_class is not None else predicted_class
         
         save_path = Path(save_dir) if save_dir else None
@@ -526,8 +490,7 @@ class NetModule(L.LightningModule):
         
         return comparison_results
     
-    def analyze_prediction_with_smoothgrad(self, mnv: torch.Tensor, fluid: torch.Tensor, 
-                                          ga: torch.Tensor, drusen: torch.Tensor,
+    def analyze_prediction_with_smoothgrad(self, mat: torch.Tensor,
                                           target_class: Optional[int] = None,
                                           save_dir: Optional[str] = None,
                                           sample_id: str = "sample",
@@ -537,10 +500,7 @@ class NetModule(L.LightningModule):
         Analyze a prediction using SmoothGrad to show important regions with noise reduction.
         
         Args:
-            mnv: MNV image tensor [B, C, H, W]
-            fluid: Fluid image tensor [B, C, H, W]
-            ga: GA image tensor [B, C, H, W] 
-            drusen: Drusen image tensor [B, C, H, W]
+            mat:  image tensor [B, C, D, H, W]
             target_class: Target class for analysis. If None, uses predicted class
             save_dir: Directory to save visualizations
             sample_id: Identifier for this sample
@@ -557,7 +517,7 @@ class NetModule(L.LightningModule):
         
         # Make prediction
         with torch.no_grad():
-            logits = self.forward(mnv, fluid, ga, drusen)
+            logits = self.forward(mat)
             probabilities = F.softmax(logits, dim=1)
             predicted_class = int(logits.argmax(dim=1).item())
             confidence = float(probabilities[0, predicted_class].item())
@@ -566,7 +526,7 @@ class NetModule(L.LightningModule):
         visualizer = SmoothGradVisualizer(self, use_cuda=True, n_samples=n_samples, noise_level=noise_level)
         
         # Generate heatmaps
-        inputs = [mnv, fluid, ga, drusen]
+        inputs = [mat]
         analysis_target = target_class if target_class is not None else predicted_class
         
         save_path = Path(save_dir) if save_dir else None
@@ -587,8 +547,7 @@ class NetModule(L.LightningModule):
             'noise_level': noise_level
         }
     
-    def analyze_prediction_with_vargrad(self, mnv: torch.Tensor, fluid: torch.Tensor, 
-                                       ga: torch.Tensor, drusen: torch.Tensor,
+    def analyze_prediction_with_vargrad(self, mat: torch.Tensor, 
                                        target_class: Optional[int] = None,
                                        save_dir: Optional[str] = None,
                                        sample_id: str = "sample",
@@ -598,10 +557,7 @@ class NetModule(L.LightningModule):
         Analyze a prediction using VarGrad to show regions with high gradient variance.
         
         Args:
-            mnv: MNV image tensor [B, C, H, W]
-            fluid: Fluid image tensor [B, C, H, W]
-            ga: GA image tensor [B, C, H, W] 
-            drusen: Drusen image tensor [B, C, H, W]
+            mat:  image tensor [B, C, D, H, W]
             target_class: Target class for analysis. If None, uses predicted class
             save_dir: Directory to save visualizations
             sample_id: Identifier for this sample
@@ -618,7 +574,7 @@ class NetModule(L.LightningModule):
         
         # Make prediction
         with torch.no_grad():
-            logits = self.forward(mnv, fluid, ga, drusen)
+            logits = self.forward(mat)
             probabilities = F.softmax(logits, dim=1)
             predicted_class = int(logits.argmax(dim=1).item())
             confidence = float(probabilities[0, predicted_class].item())
@@ -627,7 +583,7 @@ class NetModule(L.LightningModule):
         visualizer = VarGradVisualizer(self, use_cuda=True, n_samples=n_samples, noise_level=noise_level)
         
         # Generate heatmaps
-        inputs = [mnv, fluid, ga, drusen]
+        inputs = [mat]
         analysis_target = target_class if target_class is not None else predicted_class
         
         save_path = Path(save_dir) if save_dir else None
@@ -648,8 +604,7 @@ class NetModule(L.LightningModule):
             'noise_level': noise_level
         }
     
-    def compare_all_gradient_methods(self, mnv: torch.Tensor, fluid: torch.Tensor, 
-                                    ga: torch.Tensor, drusen: torch.Tensor,
+    def compare_all_gradient_methods(self, mat: torch.Tensor,
                                     target_class: Optional[int] = None,
                                     save_dir: Optional[str] = None,
                                     sample_id: str = "sample",
@@ -659,10 +614,7 @@ class NetModule(L.LightningModule):
         Compare all gradient-based methods: Grad-CAM, Grad-CAM++, SmoothGrad, and VarGrad.
         
         Args:
-            mnv: MNV image tensor [B, C, H, W]
-            fluid: Fluid image tensor [B, C, H, W]
-            ga: GA image tensor [B, C, H, W] 
-            drusen: Drusen image tensor [B, C, H, W]
+            mat:  image tensor [B, C, D, H, W]
             target_class: Target class for analysis. If None, uses predicted class
             save_dir: Directory to save visualizations
             sample_id: Identifier for this sample
@@ -679,7 +631,7 @@ class NetModule(L.LightningModule):
         
         # Make prediction
         with torch.no_grad():
-            logits = self.forward(mnv, fluid, ga, drusen)
+            logits = self.forward(mat)
             probabilities = F.softmax(logits, dim=1)
             predicted_class = int(logits.argmax(dim=1).item())
             confidence = float(probabilities[0, predicted_class].item())
@@ -688,7 +640,7 @@ class NetModule(L.LightningModule):
         visualizer = AllMethodsComparison(self, use_cuda=True, n_samples=n_samples, noise_level=noise_level)
         
         # Generate comprehensive analysis
-        inputs = [mnv, fluid, ga, drusen]
+        inputs = [mat]
         analysis_target = target_class if target_class is not None else predicted_class
         
         save_path = Path(save_dir) if save_dir else None
@@ -711,8 +663,11 @@ class NetModule(L.LightningModule):
 
 if __name__ == '__main__':
 
-    toml_file = "./configs/config_oct.toml"
+    toml_file = "./configs/config_3d.toml"
     config = toml.load(toml_file)
     model = NetModule(config=config)
     model.summary()
-    model.to_onnx('test.onnx')
+    
+    # ONNX export - currently has issues with EfficientNet3D naming
+    # Uncomment the line below if you need ONNX export (PyTorch model works fine)
+    # model.to_onnx('test.onnx')

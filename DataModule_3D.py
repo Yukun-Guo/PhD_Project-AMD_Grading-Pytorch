@@ -8,7 +8,7 @@ import os
 import lightning as L
 from typing import Optional
 from torch.utils.data import DataLoader
-from DataPreprocessing import myDataset_img
+from DataPreprocessing import myDataset_mat
 from Utils.utils import listFiles, split_list, read_csv_file
 
 
@@ -74,7 +74,7 @@ class DataModel(L.LightningDataModule):
         self.img_shape = config['DataModule']["image_shape"]
         self.shuffle = config['DataModule']["shuffle"]
         self.split_ratio = config['DataModule']["split_ratio"]
-        self.img_size = self.img_shape[:2]  # (H, W)
+        self.img_size = self.img_shape  # (H, W)
         self.train_dataset = None
         self.valid_dataset = None
         self.test_dataset = None
@@ -111,39 +111,24 @@ class DataModel(L.LightningDataModule):
         """
 
         data_csv = read_csv_file(self.label_path)
-        self.mnv_list = [os.path.join(self.image_path, row['caseID'] + '_mnv.png') for row in data_csv]
-        self.fluid_list =  [fn.replace("_mnv", "_fluid") for fn in self.mnv_list]
-        self.ga_list = [fn.replace("_mnv", "_ga") for fn in self.mnv_list]
-        self.drusen_list = [fn.replace("_mnv", "_drusen") for fn in self.mnv_list]
+        self.mat_list = [os.path.join(self.image_path, row['caseID'] + '.mat') for row in data_csv]
         self.label_list = [int(row['label']) for row in data_csv]
         
 
-        if len(self.mnv_list) != len(self.label_list):
-            raise ValueError(f"Mismatch: {len(self.mnv_list)} images vs {len(self.label_list)} labels")
+        if len(self.mat_list) != len(self.label_list):
+            raise ValueError(f"Mismatch: {len(self.mat_list)} images vs {len(self.label_list)} labels")
         
         self.train_list, self.valid_list, self.test_list = split_list(
             list(range(len(self.label_list))), split=self.split_ratio
         )
         
-        train_mnv_list = [self.mnv_list[i] for i in self.train_list]
-        train_fluid_list = [self.fluid_list[i] for i in self.train_list]
-        train_ga_list = [self.ga_list[i] for i in self.train_list]
-        train_drusen_list = [self.drusen_list[i] for i in self.train_list]
-        train_label_list = [self.label_list[i] for i in self.train_list]
-        valid_mnv_list = [self.mnv_list[i] for i in self.valid_list]
-        valid_fluid_list = [self.fluid_list[i] for i in self.valid_list]
-        valid_ga_list = [self.ga_list[i] for i in self.valid_list]
-        valid_drusen_list = [self.drusen_list[i] for i in self.valid_list]
-        valid_label_list = [self.label_list[i] for i in self.valid_list]
-        test_mnv_list = [self.mnv_list[i] for i in self.test_list]
-        test_fluid_list = [self.fluid_list[i] for i in self.test_list]
-        test_ga_list = [self.ga_list[i] for i in self.test_list]
-        test_drusen_list = [self.drusen_list[i] for i in self.test_list]
-        test_label_list = [self.label_list[i] for i in self.test_list]
+        train_mat_list = [self.mat_list[i] for i in self.train_list]
+        valid_mat_list = [self.mat_list[i] for i in self.valid_list]
+        test_mat_list = [self.mat_list[i] for i in self.test_list]
         
-        self.train_dataset = myDataset_img(train_mnv_list, train_fluid_list, train_ga_list, train_drusen_list, train_label_list, self.img_size)
-        self.valid_dataset = myDataset_img(valid_mnv_list, valid_fluid_list, valid_ga_list, valid_drusen_list, valid_label_list, self.img_size)
-        self.test_dataset = myDataset_img(test_mnv_list, test_fluid_list, test_ga_list, test_drusen_list, test_label_list, self.img_size)
+        self.train_dataset = myDataset_mat(train_mat_list, [self.label_list[i] for i in self.train_list], out_size=self.img_size, data_type="3d")
+        self.valid_dataset = myDataset_mat(valid_mat_list, [self.label_list[i] for i in self.valid_list], out_size=self.img_size, data_type="3d")
+        self.test_dataset = myDataset_mat(test_mat_list, [self.label_list[i] for i in self.test_list], out_size=self.img_size, data_type="3d")
         
         print(f'Train on {len(self.train_dataset)} samples, '
               f'validation on {len(self.valid_dataset)} samples, '
@@ -206,7 +191,7 @@ class DataModel(L.LightningDataModule):
 if __name__ == "__main__":
     import toml
 
-    toml_file = "./configs/config_oct.toml"
+    toml_file = "./configs/config_3d.toml"
     config = toml.load(toml_file)
 
     data_model = DataModel(config=config)
@@ -214,5 +199,5 @@ if __name__ == "__main__":
 
     train_loader = data_model.train_dataloader()
     for batch in train_loader:
-        mnv, fluid, ga, drusen, y, fname = batch
-        print(mnv.shape, fluid.shape, ga.shape, drusen.shape, y, fname)
+        mat, y, fname = batch
+        print(mat.shape, y, fname)

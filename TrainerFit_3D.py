@@ -1,8 +1,8 @@
 import os
 import lightning as L
 import torch
-from NetModule import NetModule
-from DataModule import DataModel
+from NetModule_3D import NetModule
+from DataModule_3D import DataModel
 import toml
 # set device
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"

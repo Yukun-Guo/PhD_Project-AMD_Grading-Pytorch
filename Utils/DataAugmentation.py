@@ -136,7 +136,7 @@ class RandomCrop3D(object):
         fill=0,
         padding_mode="constant",
     ):
-        assert isinstance(output_size, (int, tuple))
+        assert isinstance(output_size, (int, tuple,list))
         if isinstance(output_size, int):
             self.size = (output_size, output_size, output_size)
         else:
@@ -162,10 +162,9 @@ class RandomCrop3D(object):
         return i, j, k, th, tw, td
 
     def __call__(self, sample):
-        img, mask = sample["img"], sample["mask"]
+        img, label = sample["mat"], sample["label"]
         if self.padding is not None:
             img = np.pad(img, self.padding, self.fill, self.padding_mode)
-            mask = np.pad(mask, self.padding, self.fill, self.padding_mode)
 
         # pad the height if needed
         size = img.shape[-3:]  # [h, w, d]
@@ -203,25 +202,13 @@ class RandomCrop3D(object):
             constant_values=self.fill,
             mode=self.padding_mode,
         )
-        mask1 = np.pad(
-            mask1,
-            (pad_h, pad_w, pad_d),
-            constant_values=self.fill,
-            mode=self.padding_mode,
-        )
-        mask2 = np.pad(
-            mask2,
-            (pad_h, pad_w, pad_d),
-            constant_values=self.fill,
-            mode=self.padding_mode,
-        )
-        i, j, k, h, w, d = self.get_params3d(img, self.size, mask1)
+
+        i, j, k, h, w, d = self.get_params3d(img, self.size)
 
         # crop the image
         img = img[:, i: i + h, j: j + w, k: k + d].copy()
-        mask = mask[i: i + h, j: j + w, k: k + d].copy()
 
-        return {"img": img, "mask": mask}
+        return {"mat": img, "label": label}
 
     def __repr__(self):
         return self.__class__.__name__ + "(size={0}, padding={1})".format(
@@ -342,9 +329,29 @@ class RandomFlip(object):
             drusen = np.flip(drusen, axis=self.axis+1)
         return {"mnv": mnv, "fluid": fluid, "ga": ga, "drusen": drusen, "label": label}
 
+class RandomFlip3D(object):
+    """Horizontally/Vertical flip the given Image randomly with a given probability. the image can be 2D or 3D.
+
+    Args:
+        p (float): probability of the image being flipped. Default value is 0.5
+        axis (int): axis to flip. 0 for vertical flip, 1 for horizontal flip. Default value is 0.
+        sample (dict): {'mat': mat, 'label': label}
+    """
+
+    def __init__(self, p=0.5, axis=0):
+        self.p = p
+        self.axis = axis
+
+    def __call__(self, sample):
+        mat, label = sample["mat"], sample["label"]
+        if np.random.random() < self.p:
+            mat = np.flip(mat, axis=self.axis+1)
+        return {"mat": mat, "label": label}
+
+
 if __name__ == "__main__":
     img = np.random.randint(0, 255, (1, 128, 128, 128))
     mask = np.random.randint(0, 255, (1, 128, 128, 128))
 
-    a = AddGaussianNoise()(sample={"img": img, "mask": mask})
-    print(a["img"].shape)
+    a = AddGaussianNoise()(sample={"mat": img, "mask": mask})
+    print(a["mat"].shape)
