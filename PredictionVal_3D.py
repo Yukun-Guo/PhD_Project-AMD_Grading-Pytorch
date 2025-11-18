@@ -28,10 +28,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 
-from NetModule import NetModule
-from DataModule import DataModel
+from NetModule_3D import NetModule
+from DataModule_3D import DataModel
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def find_latest_checkpoint(checkpoint_dir, model_name):
     """
@@ -771,7 +771,7 @@ def run_comprehensive_validation():
     # Set random seed for reproducibility
     L.seed_everything(1234)
 
-    config_file = "configs/config_oct.toml"
+    config_file = "configs/config_3d.toml"
     print(f"Using config file: {config_file}")
     
     # Load configuration
@@ -814,11 +814,12 @@ def run_comprehensive_validation():
     
     with torch.no_grad():
         for batch_idx, batch in enumerate(tqdm(val_dataloader, desc="Processing batches")):
-            mnv,fluid,ga,drusen, y,_ = batch
-            mnv,fluid,ga,drusen, y = mnv.to(device),fluid.to(device),ga.to(device),drusen.to(device), y.to(device)
+            # For 3D model: single volume input [B, C, D, H, W]
+            mat, y, _ = batch
+            mat, y = mat.to(device), y.to(device)
             
             # Forward pass
-            logits = net_model(mnv,fluid,ga,drusen)
+            logits = net_model(mat)
             probabilities = F.softmax(logits, dim=1)
             predictions = torch.argmax(logits, dim=1)
             
@@ -836,9 +837,13 @@ def run_comprehensive_validation():
     print(f"Label distribution - True: {np.bincount(y_true)}")
     print(f"Label distribution - Pred: {np.bincount(y_pred)}")
     
-    # Define class names
+    # Define class names for AMD grading
     num_classes = config['DataModule']['n_class']
-    class_names = [f'Class_{i}' for i in range(num_classes)]
+    if num_classes == 4:
+        # AMD grading classes (customize based on your specific labels)
+        class_names = ['Normal', 'Early AMD', 'Intermediate AMD', 'Advanced AMD']
+    else:
+        class_names = [f'Class_{i}' for i in range(num_classes)]
     
     # Calculate comprehensive metrics
     print("Calculating comprehensive metrics...")
