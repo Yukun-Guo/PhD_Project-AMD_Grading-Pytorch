@@ -15,7 +15,7 @@ def create_index():
 
 **Analysis Date**: 2025-11-21  
 **Method**: 5-Fold Cross-Validation  
-**Models**: OCT, BIO, 3D  
+**Models**: Biomarker Model, 2D OCT/OCTA Model, 3D OCT/OCTA Model  
 **Format**: 2 Significant Digits  
 **Directory**: `analysis_results/20251121_161006/`
 
@@ -54,7 +54,7 @@ def create_index():
 ### Enhanced Figures (Recommended)
 | File | Description | Use Case |
 |------|-------------|----------|
-| `enhanced_overall_comparison.png` | 4 metrics with p-values (large fonts, 20×16) | Presentations, publications |
+| `enhanced_overall_comparison.png` | 4 metrics with p-values (large fonts, 20×28) | Presentations, publications |
 | `enhanced_perclass_heatmaps.png` | Heatmaps for all metrics and classes | Per-class analysis |
 
 ### Original Figures (Reference)
@@ -72,8 +72,8 @@ def create_index():
 ### Enhanced Tables (Recommended)
 | File | Description | Format |
 |------|-------------|--------|
-| `enhanced_overall_summary.csv` | Overall metrics (2 sig digits) | Metric, OCT, BIO, 3D |
-| `enhanced_perclass_summary.csv` | Per-class metrics (2 sig digits) | Class, Metric, OCT, BIO, 3D |
+| `enhanced_overall_summary.csv` | Overall metrics (2 sig digits) | Metric, Biomarker, 2D OCT/OCTA, 3D OCT/OCTA |
+| `enhanced_perclass_summary.csv` | Per-class metrics (2 sig digits) | Class, Metric, Biomarker, 2D OCT/OCTA, 3D OCT/OCTA |
 | `enhanced_statistical_tests.csv` | P-values and significance | Metric, Comparison, P-Value, Sig |
 
 ### Original Tables (Reference)
@@ -122,25 +122,25 @@ def create_index():
 ## 📊 QUICK REFERENCE - ALL VALUES (2 Sig Digits)
 
 ### Overall Performance
-| Metric | OCT | BIO | 3D |
-|--------|-----|-----|-----|
-| **Sensitivity** | 0.73±0.07 | 0.78±0.05 | 0.71±0.14 |
-| **Specificity** | 0.92±0.01 | 0.93±0.01 | 0.93±0.03 |
-| **F1-Score** | 0.74±0.06 | 0.77±0.05 | 0.72±0.14 |
-| **AUC-ROC** | 0.94±0.02 | 0.95±0.01 | 0.95±0.02 |
+| Metric | Biomarker Model | 2D OCT/OCTA Model | 3D OCT/OCTA Model |
+|--------|-----------------|-------------------|-------------------|
+| **Sensitivity** | 0.78±0.05 | 0.73±0.07 | 0.71±0.14 |
+| **Specificity** | 0.93±0.01 | 0.92±0.01 | 0.93±0.03 |
+| **F1-Score** | 0.77±0.05 | 0.74±0.06 | 0.72±0.14 |
+| **AUC-ROC** | 0.95±0.01 | 0.94±0.02 | 0.95±0.02 |
 
 ### Critical Finding - Early AMD Detection
 | Model | Sensitivity |
 |-------|-------------|
-| **BIO** | **0.65±0.17** ✓✓ BEST |
-| OCT | 0.38±0.20 (44% worse) |
-| 3D | 0.35±0.35 (46% worse) |
+| **Biomarker Model** | **0.65±0.17** ✓✓ BEST |
+| 2D OCT/OCTA Model | 0.38±0.20 (44% worse) |
+| 3D OCT/OCTA Model | 0.35±0.35 (46% worse) |
 
 ### Statistical Significance
 | Comparison | P-Value | Result |
 |-----------|---------|--------|
-| BIO vs OCT (Sensitivity) | 0.040 | * Significant |
-| BIO vs OCT (AUC-ROC) | 0.016 | * Significant |
+| Biomarker vs 2D OCT/OCTA (Sensitivity) | 0.040 | * Significant |
+| Biomarker vs 2D OCT/OCTA (AUC-ROC) | 0.016 | * Significant |
 | All other comparisons | >0.05 | Not significant |
 
 ---
@@ -150,7 +150,7 @@ def create_index():
 ### For Conference Presentation
 1. Use: `enhanced_overall_comparison.png`
 2. Use: `enhanced_perclass_heatmaps.png`
-3. Mention: Early AMD detection advantage (BIO: 0.65 vs OCT: 0.38)
+3. Mention: Early AMD detection advantage (Biomarker: 0.65 vs 2D OCT/OCTA: 0.38)
 4. Highlight: Statistical significance (p=0.040*, p=0.016*)
 
 ### For Journal Publication
@@ -162,8 +162,8 @@ def create_index():
 ### For Clinical Implementation
 1. Read: `THREE_MODEL_COMPREHENSIVE_REPORT.txt`
 2. Follow: Recommended Clinical Workflow section
-3. Focus: Early AMD detection advantage of BIO model
-4. Action: Deploy BIO as primary screening tool
+3. Focus: Early AMD detection advantage of Biomarker model
+4. Action: Deploy Biomarker model as primary screening tool
 
 ### For Data Scientists/Researchers
 1. Raw data: `raw_analysis_results.json`

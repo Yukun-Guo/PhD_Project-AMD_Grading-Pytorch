@@ -21,6 +21,13 @@ class EnhancedThreeModelVisualizer:
         self.class_names = ['Normal', 'Early AMD', 'Intermediate AMD', 'Advanced AMD']
         self.metrics = ['sensitivity', 'specificity', 'f1_score', 'auc_roc']
         self.metric_names = ['Sensitivity', 'Specificity', 'F1-Score', 'AUC-ROC']
+        # Model order: BIO -> OCT -> 3D with display names
+        self.model_order = ['bio', 'oct', '3d']
+        self.model_display_names = {
+            'bio': 'Biomarker Model',
+            'oct': '2D OCT/OCTA Model',
+            '3d': '3D OCT/OCTA Model'
+        }
         self.model_colors = {'oct': '#1f77b4', 'bio': '#ff7f0e', '3d': '#2ca02c'}
         
         # Set up matplotlib for better quality
@@ -41,10 +48,11 @@ class EnhancedThreeModelVisualizer:
         with open(results_file, 'r') as f:
             self.results = json.load(f)
         
-        self.models = list(self.results.keys())
+        # Use fixed model order
+        self.models = [m for m in self.model_order if m in self.results]
         self.output_dir = latest_dir
         
-        print(f"✅ Loaded results for models: {[m.upper() for m in self.models]}")
+        print(f"✅ Loaded results for models: {[self.model_display_names.get(m, m.upper()) for m in self.models]}")
         print(f"📁 Output directory: {self.output_dir}\n")
     
     def format_value(self, mean, std=None):
@@ -96,7 +104,7 @@ class EnhancedThreeModelVisualizer:
         for idx, (metric, title) in enumerate(zip(self.metrics, self.metric_names)):
             ax = axes[idx // 2, idx % 2]
             
-            # Collect data
+            # Collect data in model order
             model_names = []
             means = []
             stds = []
@@ -104,7 +112,7 @@ class EnhancedThreeModelVisualizer:
             
             for model in self.models:
                 if model in self.results and metric in self.results[model] and 'Overall' in self.results[model][metric]:
-                    model_names.append(model.upper())
+                    model_names.append(self.model_display_names.get(model, model.upper()))
                     stats_data = self.results[model][metric]['Overall']
                     means.append(stats_data['mean'])
                     stds.append(stats_data['std'])
@@ -119,7 +127,7 @@ class EnhancedThreeModelVisualizer:
                 ax.set_title(f'{title}', fontsize=18, fontweight='bold', pad=15)
                 ax.set_ylabel(f'{title} Score', fontsize=16, fontweight='bold')
                 ax.set_xticks(x_pos)
-                ax.set_xticklabels(model_names, fontsize=16, fontweight='bold')
+                ax.set_xticklabels(model_names, fontsize=14, fontweight='bold', rotation=0)
                 ax.tick_params(axis='y', labelsize=14)
                 
                 # Add value labels on bars with 2 significant digits (NO BACKGROUND BOX)
@@ -198,11 +206,12 @@ class EnhancedThreeModelVisualizer:
             # Create heatmap with better spacing
             im = ax.imshow(data_matrix, cmap='RdYlGn', aspect='auto', vmin=0, vmax=1)
             
-            # Set ticks and labels with larger fonts
+            # Set ticks and labels with larger fonts using proper model names
             ax.set_xticks(range(len(self.models)))
-            ax.set_xticklabels([m.upper() for m in self.models], fontweight='bold', fontsize=16)
+            ax.set_xticklabels([self.model_display_names.get(m, m.upper()) for m in self.models], 
+                               fontweight='bold', fontsize=12, rotation=15, ha='right')
             ax.set_yticks(range(len(self.class_names)))
-            ax.set_yticklabels(self.class_names, fontsize=16, fontweight='bold')
+            ax.set_yticklabels(self.class_names, fontsize=14, fontweight='bold')
             ax.set_title(f'{metric_name}', fontsize=18, fontweight='bold', pad=15)
             
             # Add text annotations with 2 significant digits
@@ -213,7 +222,7 @@ class EnhancedThreeModelVisualizer:
                         value_text = f"{data_matrix[i][j]:.2f}"
                         ax.text(j, i, value_text,
                                ha="center", va="center", color=text_color, 
-                               fontsize=14, fontweight='bold')
+                               fontsize=13, fontweight='bold')
             
             # Add colorbar with larger font
             cbar = plt.colorbar(im, ax=ax)
@@ -241,9 +250,9 @@ class EnhancedThreeModelVisualizer:
             for model in self.models:
                 if metric in self.results[model] and 'Overall' in self.results[model][metric]:
                     stats_data = self.results[model][metric]['Overall']
-                    row[f'{model.upper()}'] = self.format_value(stats_data['mean'], stats_data['std'])
+                    row[self.model_display_names.get(model, model.upper())] = self.format_value(stats_data['mean'], stats_data['std'])
                 else:
-                    row[f'{model.upper()}'] = 'N/A'
+                    row[self.model_display_names.get(model, model.upper())] = 'N/A'
             table_data.append(row)
         
         df_overall = pd.DataFrame(table_data)
@@ -271,22 +280,22 @@ class EnhancedThreeModelVisualizer:
                     if (metric in self.results[model] and 
                         class_name in self.results[model][metric]):
                         stats_data = self.results[model][metric][class_name]
-                        row[f'{model.upper()}'] = self.format_value(stats_data['mean'], stats_data['std'])
+                        row[self.model_display_names.get(model, model.upper())] = self.format_value(stats_data['mean'], stats_data['std'])
                     else:
-                        row[f'{model.upper()}'] = 'N/A'
+                        row[self.model_display_names.get(model, model.upper())] = 'N/A'
                 class_data.append(row)
             
             df_class = pd.DataFrame(class_data)
             print(df_class.to_string(index=False))
             
-            # Track for comprehensive file
+            # Track for comprehensive file - use ordered model display names
             for _, row in df_class.iterrows():
                 all_class_data.append({
                     'Class': class_name,
                     'Metric': row['Metric'],
-                    'OCT': row.get('OCT', 'N/A'),
-                    'BIO': row.get('BIO', 'N/A'),
-                    '3D': row.get('3D', 'N/A')
+                    'Biomarker Model': row.get('Biomarker Model', 'N/A'),
+                    '2D OCT/OCTA Model': row.get('2D OCT/OCTA Model', 'N/A'),
+                    '3D OCT/OCTA Model': row.get('3D OCT/OCTA Model', 'N/A')
                 })
         
         # Save comprehensive class data
@@ -311,7 +320,7 @@ class EnhancedThreeModelVisualizer:
                     
                     sig_data.append({
                         'Metric': metric_name,
-                        'Comparison': f'{model1.upper()} vs {model2.upper()}',
+                        'Comparison': f'{self.model_display_names.get(model1, model1.upper())} vs {self.model_display_names.get(model2, model2.upper())}',
                         'P-Value': f'{p_value:.3f}',
                         'Significance': significance,
                         'Difference': f'{diff:.2f}'
