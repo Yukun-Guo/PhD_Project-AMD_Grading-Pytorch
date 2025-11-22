@@ -1,12 +1,8 @@
 """
-K-Fold Cross Validation Training Script for AMD Grading
+K-Fold Cross Validation Training Script for 3D AMD Grading
 
-This script performs 5-fold cross validation training on OCT or Bio data and saves 
-comprehensive validation metrics to logs/5-k-validation_{model_type}/.
-
-Supports both:
-- OCT data with config_oct.toml (saves to logs/5-k-validation_oct/)
-- Bio data with config_bio.toml (saves to logs/5-k-validation_bio/)
+This script performs 5-fold cross validation training on 3D OCT data using config_3d.toml
+and saves comprehensive validation metrics to logs/5-k-validation_3d/.
 """
 
 import os
@@ -29,51 +25,39 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 
-from DataPreprocessing import myDataset_img
-from NetModule import NetModule
+from DataPreprocessing import myDataset_mat
+from NetModule_3D import NetModule
 from Utils.utils import k_fold_split, read_csv_file
 
 
-class MultiModalKFoldDataModule(L.LightningDataModule):
-    """DataModule for K-fold training with multi-modal data (OCT or Bio)."""
+class KFold3DDataModule(L.LightningDataModule):
+    """DataModule for K-fold training with 3D OCT .mat data."""
     
-    def __init__(self, train_indices, val_indices, mnv_list, fluid_list, ga_list, 
-                 drusen_list, label_list, img_size, batch_size, data_type="oct", shuffle=True):
+    def __init__(self, train_indices, val_indices, mat_list, label_list, 
+                 img_size, batch_size, shuffle=True):
         super().__init__()
         self.train_indices = train_indices
         self.val_indices = val_indices
-        self.mnv_list = mnv_list
-        self.fluid_list = fluid_list
-        self.ga_list = ga_list
-        self.drusen_list = drusen_list
+        self.mat_list = mat_list
         self.label_list = label_list
         self.img_size = img_size
         self.batch_size = batch_size
-        self.data_type = data_type
         self.shuffle = shuffle
 
     def setup(self, stage=None):
         # Create training lists
-        train_mnv_list = [self.mnv_list[i] for i in self.train_indices]
-        train_fluid_list = [self.fluid_list[i] for i in self.train_indices]
-        train_ga_list = [self.ga_list[i] for i in self.train_indices]
-        train_drusen_list = [self.drusen_list[i] for i in self.train_indices]
+        train_mat_list = [self.mat_list[i] for i in self.train_indices]
         train_label_list = [self.label_list[i] for i in self.train_indices]
         
         # Create validation lists
-        val_mnv_list = [self.mnv_list[i] for i in self.val_indices]
-        val_fluid_list = [self.fluid_list[i] for i in self.val_indices]
-        val_ga_list = [self.ga_list[i] for i in self.val_indices]
-        val_drusen_list = [self.drusen_list[i] for i in self.val_indices]
+        val_mat_list = [self.mat_list[i] for i in self.val_indices]
         val_label_list = [self.label_list[i] for i in self.val_indices]
         
-        self.train_dataset = myDataset_img(
-            train_mnv_list, train_fluid_list, train_ga_list, train_drusen_list, 
-            train_label_list, self.img_size, data_type=self.data_type
+        self.train_dataset = myDataset_mat(
+            train_mat_list, train_label_list, self.img_size, data_type="3d"
         )
-        self.val_dataset = myDataset_img(
-            val_mnv_list, val_fluid_list, val_ga_list, val_drusen_list, 
-            val_label_list, self.img_size, data_type=self.data_type
+        self.val_dataset = myDataset_mat(
+            val_mat_list, val_label_list, self.img_size, data_type="3d"
         )
 
     def train_dataloader(self):
@@ -93,7 +77,6 @@ class MultiModalKFoldDataModule(L.LightningDataModule):
             num_workers=2,
             pin_memory=True
         )
-
 
 
 def compute_validation_metrics(y_true, y_pred, y_probs, num_classes=4):
@@ -230,7 +213,7 @@ def save_fold_results(results, fold_idx, output_dir):
     # Save summary text
     with open(fold_dir / 'validation_summary.txt', 'w') as f:
         f.write("=" * 80 + "\n")
-        f.write(f"FOLD {fold_idx + 1} VALIDATION EVALUATION REPORT\n")
+        f.write(f"FOLD {fold_idx + 1} VALIDATION EVALUATION REPORT - 3D MODEL\n")
         f.write("=" * 80 + "\n")
         f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"Total Samples: {len(results['y_true'])}\n")
@@ -255,7 +238,7 @@ def save_fold_results(results, fold_idx, output_dir):
 
 
 def evaluate_fold(model, dataloader, device, num_classes=4):
-    """Evaluate model on validation data and return predictions and probabilities"""
+    """Evaluate 3D model on validation data and return predictions and probabilities"""
     model.eval()
     all_preds = []
     all_probs = []
@@ -263,10 +246,10 @@ def evaluate_fold(model, dataloader, device, num_classes=4):
     
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="Evaluating"):
-            mnv, fluid, ga, drusen, targets, _ = batch
-            mnv, fluid, ga, drusen, targets = mnv.to(device), fluid.to(device), ga.to(device), drusen.to(device), targets.to(device)
+            mat_data, targets, _ = batch
+            mat_data, targets = mat_data.to(device), targets.to(device)
             
-            logits = model(mnv, fluid, ga, drusen)
+            logits = model(mat_data)
             probs = F.softmax(logits, dim=1)
             preds = torch.argmax(logits, dim=1)
             
@@ -281,28 +264,16 @@ def run_kfold_training(config_path=None):
     """Main function to run k-fold cross validation training with comprehensive validation.
     
     Args:
-        config_path (str, optional): Path to config file. If None, defaults to config_oct.toml
+        config_path (str, optional): Path to config file. If None, defaults to config_3d.toml
     """
     # Set random seed
     L.seed_everything(1234)
     
-    # Determine config path and model type
+    # Determine config path
     if config_path is None:
-        config_path = 'configs/config_oct.toml'
+        config_path = 'configs/config_3d.toml'
     
-    # Determine model type from config filename
-    if 'oct' in config_path.lower():
-        model_type = 'oct'
-        data_type = 'oct'
-    elif 'bio' in config_path.lower():
-        model_type = 'bio'
-        data_type = 'bio'
-    else:
-        model_type = 'unknown'
-        data_type = 'oct'  # default fallback
-    
-    print(f"Loading configuration from: {config_path}")
-    print(f"Model type detected: {model_type.upper()}")
+    print(f"Loading 3D configuration from: {config_path}")
     
     with open(config_path, 'r') as f:
         config = toml.load(f)
@@ -311,20 +282,17 @@ def run_kfold_training(config_path=None):
     data_config = config['DataModule']
     net_config = config['NetModule']
     
-    # Load data from CSV
+    # Load 3D data from CSV
     data_csv = read_csv_file(data_config['label_path'])
-    mnv_list = [os.path.join(data_config['data_path'], row['caseID'] + '_mnv.png') for row in data_csv]
-    fluid_list = [fn.replace("_mnv", "_fluid") for fn in mnv_list]
-    ga_list = [fn.replace("_mnv", "_ga") for fn in mnv_list]
-    drusen_list = [fn.replace("_mnv", "_drusen") for fn in mnv_list]
+    mat_list = [os.path.join(data_config['data_path'], row['caseID'] + '.mat') for row in data_csv]
     label_list = [int(row['label']) for row in data_csv]
     
-    if len(mnv_list) != len(label_list):
-        raise ValueError(f"Mismatch: {len(mnv_list)} images vs {len(label_list)} labels")
+    if len(mat_list) != len(label_list):
+        raise ValueError(f"Mismatch: {len(mat_list)} mat files vs {len(label_list)} labels")
     
     # K-fold parameters
     k_folds = 5  # Fixed to 5-fold as requested
-    img_size = tuple(data_config['image_shape'][:2])  # (H, W)
+    img_size = tuple(data_config['image_shape'])  # (D, H, W) for 3D
     batch_size = data_config['batch_size']
     num_classes = data_config['n_class']
     
@@ -333,15 +301,14 @@ def run_kfold_training(config_path=None):
     
     # Create output directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = f"logs/5-k-validation_{model_type}/{timestamp}"
+    output_dir = f"logs/5-k-validation_3d/{timestamp}"
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     
-    print(f"Starting {k_folds}-fold cross validation for {model_type.upper()} AMD Grading")
+    print(f"Starting {k_folds}-fold cross validation for 3D AMD Grading")
     print(f"Total samples: {len(label_list)}")
     print(f"Image size: {img_size}")
     print(f"Batch size: {batch_size}")
     print(f"Number of classes: {num_classes}")
-    print(f"Data type: {data_type}")
     print(f"Results will be saved to: {output_dir}")
     print("-" * 70)
     
@@ -354,24 +321,20 @@ def run_kfold_training(config_path=None):
         print(f"Train samples: {len(train_indices)}, Val samples: {len(val_indices)}")
         
         # Create data module for this fold
-        datamodule = MultiModalKFoldDataModule(
+        datamodule = KFold3DDataModule(
             train_indices=train_indices,
             val_indices=val_indices,
-            mnv_list=mnv_list,
-            fluid_list=fluid_list,
-            ga_list=ga_list,
-            drusen_list=drusen_list,
+            mat_list=mat_list,
             label_list=label_list,
             img_size=img_size,
             batch_size=batch_size,
-            data_type=data_type,
             shuffle=data_config.get('shuffle', True)
         )
         
         # Update config with current fold info
         fold_config = config.copy()
-        fold_config['NetModule']['checkpoint_dir'] = f"./logs/5-k-validation_{model_type}/{timestamp}/fold_{fold_idx + 1}/"
-        fold_config['NetModule']['log_dir'] = f"./logs/5-k-validation_{model_type}/{timestamp}/fold_{fold_idx + 1}/"
+        fold_config['NetModule']['checkpoint_dir'] = f"./logs/5-k-validation_3d/{timestamp}/fold_{fold_idx + 1}/"
+        fold_config['NetModule']['log_dir'] = f"./logs/5-k-validation_3d/{timestamp}/fold_{fold_idx + 1}/"
         
         # Create model
         model = NetModule(config=fold_config)
@@ -425,12 +388,11 @@ def run_kfold_training(config_path=None):
     summary_file = Path(output_dir) / "cross_validation_summary.txt"
     with open(summary_file, 'w') as f:
         f.write("=" * 80 + "\n")
-        f.write(f"5-FOLD CROSS VALIDATION SUMMARY - {model_type.upper()} AMD GRADING\n")
+        f.write("5-FOLD CROSS VALIDATION SUMMARY - 3D AMD GRADING\n")
         f.write("=" * 80 + "\n")
         f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"Configuration: {config_path}\n")
-        f.write(f"Model type: {model_type.upper()}\n")
-        f.write(f"Data type: {data_type}\n")
+        f.write(f"Model type: 3D\n")
         f.write(f"Total samples: {len(label_list)}\n")
         f.write(f"Number of folds: {k_folds}\n\n")
         
@@ -451,7 +413,7 @@ def run_kfold_training(config_path=None):
     summary_df = pd.DataFrame([summary_metrics])
     summary_df.to_csv(Path(output_dir) / "cross_validation_metrics.csv", index=False)
     
-    print(f"\n5-fold cross validation completed for {model_type.upper()} model!")
+    print(f"\n5-fold cross validation completed for 3D model!")
     print(f"Results saved to: {output_dir}")
     print(f"Mean Accuracy: {summary_metrics['accuracy_mean']:.4f} ± {summary_metrics['accuracy_std']:.4f}")
     print(f"Mean F1-Score: {summary_metrics['f1_macro_mean']:.4f} ± {summary_metrics['f1_macro_std']:.4f}")
@@ -463,6 +425,6 @@ if __name__ == "__main__":
         config_path = sys.argv[1]
         run_kfold_training(config_path)
     else:
-        # Default to OCT if no argument provided
-        run_kfold_training('configs/config_oct.toml')
+        # Default to 3D config
+        run_kfold_training('configs/config_3d.toml')
 

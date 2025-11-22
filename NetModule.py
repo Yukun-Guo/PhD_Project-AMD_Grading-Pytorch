@@ -226,8 +226,8 @@ class NetModule(L.LightningModule):
         train_acc = FM.accuracy(y_hat_argmax, y, num_classes=self.n_class,task='multiclass')
         
         # self.log("train_f1", train_f1, on_epoch=True, prog_bar=True, logger=True)
-        self.log("train_loss", train_loss, on_epoch=True, prog_bar=True, logger=True)
-        self.log("train_acc", train_acc, on_epoch=True, prog_bar=True, logger=True)
+        self.log("train_loss", train_loss, on_epoch=True, prog_bar=True, logger=True,batch_size=mnv.size(0))
+        self.log("train_acc", train_acc, on_epoch=True, prog_bar=True, logger=True,batch_size=mnv.size(0))
 
         return {'loss': train_loss}
 
@@ -250,7 +250,7 @@ class NetModule(L.LightningModule):
         # val_f1 = FM.f1_score(y_hat_argmax, y, average='macro', num_classes=self.n_class,task='multiclass')
         val_acc = FM.accuracy(y_hat_argmax, y, num_classes=self.n_class,task='multiclass')
         cur_lr = self.trainer.optimizers[0].param_groups[0]['lr']
-        self.log_dict({'val_loss': val_loss, 'val_acc': val_acc, 'lr': cur_lr}, prog_bar=True, logger=True)
+        self.log_dict({'val_loss': val_loss, 'val_acc': val_acc, 'lr': cur_lr}, prog_bar=True, logger=True,batch_size=mnv.size(0))
 
     def configure_optimizers(self) -> Tuple[List[torch.optim.Optimizer], List[Dict[str, Any]]]:
         """

@@ -11,7 +11,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 print(torch.cuda.device_count())
 L.seed_everything(1234)
 
-toml_file = "./configs/config_3d.toml"
+toml_file = "./configs/config_oct.toml"
 config = toml.load(toml_file)
 
 data_model = DataModel(config=config)

@@ -1,0 +1,13 @@
+Metric,Comparison,P-Value,Significance,Difference
+Sensitivity,OCT vs BIO,0.040,*,0.05
+Sensitivity,OCT vs 3D,0.857,ns,-0.02
+Sensitivity,BIO vs 3D,0.375,ns,-0.07
+Specificity,OCT vs BIO,0.059,ns,0.01
+Specificity,OCT vs 3D,0.537,ns,0.01
+Specificity,BIO vs 3D,0.999,ns,0.00
+F1-Score,OCT vs BIO,0.191,ns,0.02
+F1-Score,OCT vs 3D,0.787,ns,-0.02
+F1-Score,BIO vs 3D,0.550,ns,-0.05
+AUC-ROC,OCT vs BIO,0.016,*,0.01
+AUC-ROC,OCT vs 3D,0.417,ns,0.01
+AUC-ROC,BIO vs 3D,0.933,ns,0.00
