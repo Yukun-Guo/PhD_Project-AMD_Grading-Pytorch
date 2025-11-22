@@ -68,7 +68,7 @@ class EnhancedVisualizer:
         elif p_value < 0.05:
             return "*"
         else:
-            return "ns"
+            return ""
     
     def add_significance_bars(self, ax, x_positions, heights, model_pairs, metric, class_name='Overall'):
         """Add significance bars with p-values above bar plots"""
@@ -97,13 +97,16 @@ class EnhancedVisualizer:
                     significance = self.get_significance_symbol(p_value)
                     p_text = f"p={p_value:.3f}{significance}" if significance != "ns" else f"p={p_value:.3f}"
                     ax.text((x1 + x2) / 2, y + text_height, p_text, 
-                           ha='center', va='bottom', fontsize=9, fontweight='bold')
+                           ha='center', va='bottom', fontsize=18, fontweight='bold')
     
     def create_enhanced_overall_comparison(self):
         """Create enhanced overall performance comparison with p-values"""
+        title_font_size = 40
+        label_font_size = 38
+        value_font_size = 38
         fig, axes = plt.subplots(2, 2, figsize=(16, 14))
         fig.suptitle('5-Fold Cross-Validation Results - Overall Performance Comparison\nwith Statistical Significance', 
-                     fontsize=16, fontweight='bold')
+                     fontsize=title_font_size, fontweight='bold')
         
         # Generate all model pairs for comparison
         model_pairs = [(self.models[i], self.models[j]) 
@@ -131,8 +134,8 @@ class EnhancedVisualizer:
                 colors = plt.cm.get_cmap('Set3')(np.linspace(0, 1, len(model_names)))
                 bars = ax.bar(model_names, means, yerr=stds, capsize=5, alpha=0.8, color=colors)
                 
-                ax.set_title(f'{title}', fontsize=14, fontweight='bold')
-                ax.set_ylabel(f'{title} Score', fontsize=12)
+                ax.set_title(f'{title}', fontsize=title_font_size, fontweight='bold')
+                ax.set_ylabel(f'{title} Score', fontsize=label_font_size)
                 ax.set_ylim(0, min(1.2, max(means) + max(stds) + 0.3))
                 
                 # Add value labels on bars
@@ -140,7 +143,7 @@ class EnhancedVisualizer:
                     height = bar.get_height()
                     ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.01,
                            f'{mean:.3f}\n±{std:.3f}', ha='center', va='bottom', 
-                           fontsize=10, fontweight='bold')
+                           fontsize=value_font_size, fontweight='bold')
                 
                 # Add significance bars
                 x_positions = [bar.get_x() + bar.get_width()/2 for bar in bars]
@@ -196,9 +199,9 @@ class EnhancedVisualizer:
                     
                     # Set title and labels
                     if class_idx == 0:
-                        ax.set_title(f'{metric_name}', fontsize=12, fontweight='bold')
+                        ax.set_title(f'{metric_name}', fontsize=18, fontweight='bold')
                     if metric_idx == 0:
-                        ax.set_ylabel(f'{class_name}', fontsize=12, fontweight='bold', rotation=0, ha='right')
+                        ax.set_ylabel(f'{class_name}', fontsize=18, fontweight='bold', rotation=0, ha='right')
                     
                     ax.set_ylim(0, min(1.2, max(means) + max(stds) + 0.25))
                     
@@ -207,7 +210,7 @@ class EnhancedVisualizer:
                         height = bar.get_height()
                         ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.01,
                                f'{mean:.3f}\n±{std:.3f}', ha='center', va='bottom', 
-                               fontsize=8, fontweight='bold')
+                               fontsize=16, fontweight='bold')
                     
                     # Add significance bars
                     x_positions = [bar.get_x() + bar.get_width()/2 for bar in bars]
@@ -220,7 +223,7 @@ class EnhancedVisualizer:
                     ax.grid(True, alpha=0.3, axis='y')
                 else:
                     ax.text(0.5, 0.5, 'No Data', ha='center', va='center', 
-                           transform=ax.transAxes, fontsize=12)
+                           transform=ax.transAxes, fontsize=18)
                     ax.set_xticks([])
                     ax.set_yticks([])
         
@@ -237,7 +240,7 @@ class EnhancedVisualizer:
             return
         
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-        fig.suptitle('Statistical Significance Matrix (p-values)', fontsize=16, fontweight='bold')
+        fig.suptitle('Statistical Significance Matrix (p-values)', fontsize=20, fontweight='bold')
         
         model_pairs = [(self.models[i], self.models[j]) 
                       for i in range(len(self.models)) 
@@ -270,8 +273,8 @@ class EnhancedVisualizer:
             ax.set_xticks(range(n_categories))
             ax.set_xticklabels(categories, rotation=45, ha='right')
             ax.set_yticks(range(n_pairs))
-            ax.set_yticklabels(pair_labels, fontsize=10)
-            ax.set_title(f'{metric_name} - Significance Matrix\n(-log10 p-value)', fontsize=12)
+            ax.set_yticklabels(pair_labels, fontsize=16)
+            ax.set_title(f'{metric_name} - Significance Matrix\n(-log10 p-value)', fontsize=18)
             
             # Add text annotations
             for i in range(n_pairs):
@@ -282,7 +285,7 @@ class EnhancedVisualizer:
                         significance = self.get_significance_symbol(p_val)
                         text_color = 'white' if matrix_data[i, j] > 1.3 else 'black'  # -log10(0.05) ≈ 1.3
                         ax.text(j, i, f'{p_val:.3f}\n{significance}', 
-                               ha="center", va="center", color=text_color, fontsize=8)
+                               ha="center", va="center", color=text_color, fontsize=16)
             
             # Add colorbar
             cbar = plt.colorbar(im, ax=ax)
@@ -336,8 +339,8 @@ class EnhancedVisualizer:
         # Customize the plot
         ax.set_yticks(y_positions)
         ax.set_yticklabels([f"{metric_name}\n{class_name}" for metric, class_name, metric_name in combinations])
-        ax.set_xlabel('Performance Score', fontsize=12)
-        ax.set_title('Model Performance Ranking by Metric and Class', fontsize=16, fontweight='bold')
+        ax.set_xlabel('Performance Score', fontsize=18)
+        ax.set_title('Model Performance Ranking by Metric and Class', fontsize=20, fontweight='bold')
         ax.set_xlim(0, 1.2)
         ax.grid(True, alpha=0.3, axis='x')
         

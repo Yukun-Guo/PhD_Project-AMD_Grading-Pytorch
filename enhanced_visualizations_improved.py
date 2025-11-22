@@ -10,6 +10,8 @@ Enhanced Visualizations for Three-Model Comparison
 import json
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for faster rendering
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
@@ -20,7 +22,7 @@ class EnhancedThreeModelVisualizer:
     def __init__(self):
         self.class_names = ['Normal', 'Early AMD', 'Intermediate AMD', 'Advanced AMD']
         self.metrics = ['sensitivity', 'specificity', 'f1_score', 'auc_roc']
-        self.metric_names = ['Sensitivity', 'Specificity', 'F1-Score', 'AUC-ROC']
+        self.metric_names = ['Sensitivity', 'Specificity', 'F1-Score', 'AROC']
         # Model order: BIO -> OCT -> 3D with display names
         self.model_order = ['bio', 'oct', '3d']
         self.model_display_names = {
@@ -33,7 +35,7 @@ class EnhancedThreeModelVisualizer:
         # Set up matplotlib for better quality
         plt.rcParams['figure.dpi'] = 300
         plt.rcParams['savefig.dpi'] = 300
-        plt.rcParams['font.size'] = 12
+        plt.rcParams['font.size'] = 18
         plt.rcParams['font.weight'] = 'bold'
         
     def load_results(self):
@@ -89,14 +91,14 @@ class EnhancedThreeModelVisualizer:
         elif p_value < 0.05:
             return "*"
         else:
-            return "ns"
+            return ""
     
     def create_overall_comparison_enhanced(self):
         """Create enhanced overall comparison with better formatting"""
-        # Increased height: 20 -> 28 inches for more vertical space
-        fig, axes = plt.subplots(2, 2, figsize=(20, 28))
+        # Optimized figure size: 20x24 (faster than 20x28, still plenty of room)
+        fig, axes = plt.subplots(2, 2, figsize=(20, 24))
         fig.suptitle('5-Fold Cross-Validation: Overall Performance Comparison\nOCT vs BIO vs 3D Models', 
-                     fontsize=20, fontweight='bold', y=0.995)
+                     fontsize=5+20, fontweight='bold', y=0.995)
         
         # Get model pairs for comparison
         model_pairs = list(combinations(self.models, 2))
@@ -124,10 +126,10 @@ class EnhancedThreeModelVisualizer:
                 bars = ax.bar(x_pos, means, yerr=stds, capsize=12, alpha=0.85, color=colors, 
                              edgecolor='black', linewidth=2.5, width=0.6)
                 
-                ax.set_title(f'{title}', fontsize=18, fontweight='bold', pad=15)
-                ax.set_ylabel(f'{title} Score', fontsize=16, fontweight='bold')
+                ax.set_title(f'{title}', fontsize=5+18, fontweight='bold', pad=15)
+                ax.set_ylabel(f'{title} Score', fontsize=5+16, fontweight='bold')
                 ax.set_xticks(x_pos)
-                ax.set_xticklabels(model_names, fontsize=14, fontweight='bold', rotation=0)
+                ax.set_xticklabels(model_names, fontsize=5+14, fontweight='bold', rotation=0)
                 ax.tick_params(axis='y', labelsize=14)
                 
                 # Add value labels on bars with 2 significant digits (NO BACKGROUND BOX)
@@ -136,7 +138,7 @@ class EnhancedThreeModelVisualizer:
                     value_text = self.format_value(mean, std)
                     ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.02,
                            value_text, ha='center', va='bottom', 
-                           fontsize=14, fontweight='bold')
+                           fontsize=5+14, fontweight='bold')
                 
                 # Add significance bars with more room
                 y_max = max([m + s for m, s in zip(means, stds)])
@@ -168,7 +170,7 @@ class EnhancedThreeModelVisualizer:
                                 significance = self.get_significance_symbol(p_value)
                                 p_text = f"p={p_value:.3f} {significance}"
                                 ax.text((x1 + x2) / 2, y + 0.035, p_text, 
-                                       ha='center', va='bottom', fontsize=12, fontweight='bold')
+                                       ha='center', va='bottom', fontsize=5+12, fontweight='bold')
                 
                 # Set y-limit with sufficient padding for p-values
                 ax.set_ylim(0, max(1.2, max_p_value_y + 0.05))
@@ -184,7 +186,7 @@ class EnhancedThreeModelVisualizer:
         """Create separate heatmaps for each metric with better spacing"""
         fig, axes = plt.subplots(2, 2, figsize=(20, 16))
         fig.suptitle('Per-Class Performance Comparison: All Models and Metrics', 
-                     fontsize=20, fontweight='bold', y=0.995)
+                     fontsize=5+20, fontweight='bold', y=0.995)
         
         for metric_idx, (metric, metric_name) in enumerate(zip(self.metrics, self.metric_names)):
             ax = axes[metric_idx // 2, metric_idx % 2]
@@ -209,10 +211,10 @@ class EnhancedThreeModelVisualizer:
             # Set ticks and labels with larger fonts using proper model names
             ax.set_xticks(range(len(self.models)))
             ax.set_xticklabels([self.model_display_names.get(m, m.upper()) for m in self.models], 
-                               fontweight='bold', fontsize=12, rotation=15, ha='right')
+                               fontweight='bold', fontsize=5+12, rotation=15, ha='right')
             ax.set_yticks(range(len(self.class_names)))
-            ax.set_yticklabels(self.class_names, fontsize=14, fontweight='bold')
-            ax.set_title(f'{metric_name}', fontsize=18, fontweight='bold', pad=15)
+            ax.set_yticklabels(self.class_names, fontsize=5+14, fontweight='bold')
+            ax.set_title(f'{metric_name}', fontsize=5+18, fontweight='bold', pad=15)
             
             # Add text annotations with 2 significant digits
             for i in range(len(self.class_names)):
@@ -222,11 +224,11 @@ class EnhancedThreeModelVisualizer:
                         value_text = f"{data_matrix[i][j]:.2f}"
                         ax.text(j, i, value_text,
                                ha="center", va="center", color=text_color, 
-                               fontsize=13, fontweight='bold')
+                               fontsize=5+13, fontweight='bold')
             
             # Add colorbar with larger font
             cbar = plt.colorbar(im, ax=ax)
-            cbar.set_label('Performance Score', rotation=270, labelpad=25, fontsize=14, fontweight='bold')
+            cbar.set_label('Performance Score', rotation=270, labelpad=25, fontsize=5+14, fontweight='bold')
             cbar.ax.tick_params(labelsize=12)
         
         plt.tight_layout()

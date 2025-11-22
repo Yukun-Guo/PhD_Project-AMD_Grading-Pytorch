@@ -2,16 +2,16 @@ Class,Metric,Biomarker Model,2D OCT/OCTA Model,3D OCT/OCTA Model
 Normal,Sensitivity,0.84±0.05,0.92±0.06,0.80±0.17
 Normal,Specificity,0.98±0.00,0.99±0.01,0.99±0.00
 Normal,F1-Score,0.82±0.04,0.92±0.03,0.84±0.12
-Normal,AUC-ROC,0.99±0.00,1.00±0.00,0.99±0.01
+Normal,AROC,0.99±0.00,1.00±0.00,0.99±0.01
 Early AMD,Sensitivity,0.65±0.17,0.38±0.20,0.35±0.35
 Early AMD,Specificity,0.98±0.01,0.99±0.00,0.99±0.01
 Early AMD,F1-Score,0.59±0.14,0.46±0.20,0.36±0.34
-Early AMD,AUC-ROC,0.98±0.01,0.96±0.03,0.97±0.02
+Early AMD,AROC,0.98±0.01,0.96±0.03,0.97±0.02
 Intermediate AMD,Sensitivity,0.76±0.04,0.82±0.02,0.83±0.06
 Intermediate AMD,Specificity,0.89±0.02,0.80±0.04,0.84±0.08
 Intermediate AMD,F1-Score,0.78±0.03,0.76±0.02,0.79±0.08
-Intermediate AMD,AUC-ROC,0.90±0.03,0.88±0.02,0.91±0.05
+Intermediate AMD,AROC,0.90±0.03,0.88±0.02,0.91±0.05
 Advanced AMD,Sensitivity,0.89±0.03,0.80±0.04,0.87±0.05
 Advanced AMD,Specificity,0.86±0.02,0.88±0.02,0.89±0.05
 Advanced AMD,F1-Score,0.88±0.02,0.84±0.02,0.88±0.05
-Advanced AMD,AUC-ROC,0.94±0.01,0.92±0.02,0.95±0.02
+Advanced AMD,AROC,0.94±0.01,0.92±0.02,0.95±0.02
