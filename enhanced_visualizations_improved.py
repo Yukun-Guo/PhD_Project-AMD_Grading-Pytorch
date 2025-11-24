@@ -127,9 +127,9 @@ class EnhancedThreeModelVisualizer:
                              edgecolor='black', linewidth=2.5, width=0.6)
                 
                 ax.set_title(f'{title}', fontsize=5+18, fontweight='bold', pad=15)
-                ax.set_ylabel(f'{title} Score', fontsize=5+16, fontweight='bold')
+                ax.set_ylabel(f'{title} Score', fontsize=5+14, fontweight='bold')
                 ax.set_xticks(x_pos)
-                ax.set_xticklabels(model_names, fontsize=5+14, fontweight='bold', rotation=0)
+                ax.set_xticklabels(model_names, fontsize=5+13, fontweight='bold', rotation=0)
                 ax.tick_params(axis='y', labelsize=14)
                 
                 # Add value labels on bars with 2 significant digits (NO BACKGROUND BOX)
