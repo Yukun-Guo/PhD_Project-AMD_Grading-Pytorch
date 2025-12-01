@@ -23,7 +23,7 @@ import seaborn as sns
 from pathlib import Path
 from datetime import datetime
 import json
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, cohen_kappa_score
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -119,19 +119,33 @@ class CrossValidationAnalyzer:
         
         return specificities
     
+    def calculate_qwk_per_fold(self, fold_predictions):
+        """Calculate Quadratic Weighted Kappa for each fold"""
+        qwk_scores = {}
+        
+        for fold_num, data in fold_predictions.items():
+            y_true = np.array(data['y_true'])
+            y_pred = np.array(data['y_pred'])
+            
+            # Calculate Quadratic Weighted Kappa
+            qwk = cohen_kappa_score(y_true, y_pred, weights='quadratic')
+            qwk_scores[fold_num] = qwk
+        
+        return qwk_scores
+    
     def extract_metrics_by_class(self, fold_metrics):
         """Extract metrics organized by class and metric type with all averaging types"""
         # Structure: metrics_data[avg_type][metric][fold_num][class_name]
         metrics_data = {
-            'micro': {'sensitivity': {}, 'f1_score': {}, 'auc_roc': {}},
-            'macro': {'sensitivity': {}, 'f1_score': {}, 'auc_roc': {}},
-            'weighted': {'sensitivity': {}, 'f1_score': {}, 'auc_roc': {}}
+            'micro': {'sensitivity': {}, 'f1_score': {}, 'auc_roc': {}, 'qwk': {}},
+            'macro': {'sensitivity': {}, 'f1_score': {}, 'auc_roc': {}, 'qwk': {}},
+            'weighted': {'sensitivity': {}, 'f1_score': {}, 'auc_roc': {}, 'qwk': {}}
         }
         
         for fold_num, df in fold_metrics.items():
             # Initialize fold data for all averaging types
             for avg_type in ['micro', 'macro', 'weighted']:
-                for metric in ['sensitivity', 'f1_score', 'auc_roc']:
+                for metric in ['sensitivity', 'f1_score', 'auc_roc', 'qwk']:
                     metrics_data[avg_type][metric][fold_num] = {}
             
             # Extract per-class metrics (same for all averaging types)
@@ -171,7 +185,7 @@ class CrossValidationAnalyzer:
         
         return metrics_data
     
-    def calculate_statistics(self, metrics_data, specificities):
+    def calculate_statistics(self, metrics_data, specificities, qwk_scores):
         """Calculate mean and standard deviation for all metrics with all averaging types"""
         # Structure: stats[avg_type][metric_name][class_name]
         stats = {
@@ -244,6 +258,23 @@ class CrossValidationAnalyzer:
                         'values': overall_spec_values
                     }
         
+        # Process Quadratic Weighted Kappa (same for all averaging types)
+        for avg_type in ['micro', 'macro', 'weighted']:
+            stats[avg_type]['qwk'] = {}
+            
+            # QWK is an overall metric (no per-class values)
+            qwk_values = []
+            for fold_num in range(1, 6):
+                if fold_num in qwk_scores:
+                    qwk_values.append(qwk_scores[fold_num])
+            
+            if qwk_values:
+                stats[avg_type]['qwk']['Overall'] = {
+                    'mean': np.mean(qwk_values),
+                    'std': np.std(qwk_values, ddof=1) if len(qwk_values) > 1 else 0.0,
+                    'values': qwk_values
+                }
+        
         return stats
     
     def analyze_model(self, model, model_dir):
@@ -263,11 +294,14 @@ class CrossValidationAnalyzer:
         # Calculate specificity
         specificities = self.calculate_specificity_per_fold(fold_predictions)
         
+        # Calculate Quadratic Weighted Kappa
+        qwk_scores = self.calculate_qwk_per_fold(fold_predictions)
+        
         # Extract metrics by class (returns data for all averaging types)
         metrics_data = self.extract_metrics_by_class(fold_metrics)
         
         # Calculate statistics (returns stats for all averaging types)
-        stats = self.calculate_statistics(metrics_data, specificities)
+        stats = self.calculate_statistics(metrics_data, specificities, qwk_scores)
         
         return stats
     
@@ -275,8 +309,8 @@ class CrossValidationAnalyzer:
         """Create comparison table across all models for a specific averaging type"""
         comparison_data = []
         
-        metrics_order = ['sensitivity', 'specificity', 'f1_score', 'auc_roc']
-        metric_names = ['Sensitivity', 'Specificity', 'F1-Score', 'AUC-ROC']
+        metrics_order = ['sensitivity', 'specificity', 'f1_score', 'auc_roc', 'qwk']
+        metric_names = ['Sensitivity', 'Specificity', 'F1-Score', 'AUC-ROC', 'Quadratic Weighted Kappa']
         
         for model in self.models:
             if model in self.results:
@@ -316,14 +350,15 @@ class CrossValidationAnalyzer:
         sns.set_palette("husl")
         
         # Create overall performance comparison
-        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
         fig.suptitle(f'5-Fold Cross-Validation Results Comparison ({avg_type.capitalize()} Average)', fontsize=16)
         
-        metrics = ['sensitivity', 'specificity', 'f1_score', 'auc_roc']
-        metric_titles = ['Sensitivity (Recall)', 'Specificity', 'F1-Score', 'AUC-ROC']
+        metrics = ['sensitivity', 'specificity', 'f1_score', 'auc_roc', 'qwk']
+        metric_titles = ['Sensitivity (Recall)', 'Specificity', 'F1-Score', 'AUC-ROC', 'Quadratic Weighted Kappa']
         
         for idx, (metric, title) in enumerate(zip(metrics, metric_titles)):
-            ax = axes[idx // 2, idx % 2]
+            if idx < 5:  # Only plot 5 metrics
+                ax = axes[idx // 3, idx % 3]
             
             # Collect data for plotting
             model_names = []
@@ -342,13 +377,20 @@ class CrossValidationAnalyzer:
                 bars = ax.bar(model_names, means, yerr=stds, capsize=5, alpha=0.7)
                 ax.set_title(f'{title} - Overall Performance')
                 ax.set_ylabel(title)
-                ax.set_ylim(0, 1.0)
+                # QWK ranges from -1 to 1, but typically 0 to 1 for good models
+                if metric == 'qwk':
+                    ax.set_ylim(0, 1.0)
+                else:
+                    ax.set_ylim(0, 1.0)
                 
                 # Add value labels on bars
                 for bar, mean, std in zip(bars, means, stds):
                     height = bar.get_height()
                     ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.01,
                            f'{mean:.3f}±{std:.3f}', ha='center', va='bottom', fontsize=10)
+        
+        # Hide the last subplot (bottom right) since we only have 5 metrics
+        axes[1, 2].axis('off')
         
         plt.tight_layout()
         plt.savefig(output_dir / f'overall_performance_comparison_{avg_type}.png', dpi=300, bbox_inches='tight')
@@ -517,10 +559,12 @@ class CrossValidationAnalyzer:
                     print(f"\n{model.upper()} Model:")
                     print("-" * 20)
                     
-                    for metric in ['sensitivity', 'specificity', 'f1_score', 'auc_roc']:
+                    for metric in ['sensitivity', 'specificity', 'f1_score', 'auc_roc', 'qwk']:
                         if metric in self.results[model][avg_type] and 'Overall' in self.results[model][avg_type][metric]:
                             stats = self.results[model][avg_type][metric]['Overall']
                             metric_name = metric.replace('_', '-').title()
+                            if metric == 'qwk':
+                                metric_name = 'QWK'
                             print(f"{metric_name:12}: {stats['mean']:.2f} ± {stats['std']:.2f}")
 
 

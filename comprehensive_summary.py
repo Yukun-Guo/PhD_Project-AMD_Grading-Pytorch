@@ -22,8 +22,8 @@ def load_and_summarize_results():
         results = json.load(f)
     
     models = list(results.keys())
-    metrics = ['sensitivity', 'specificity', 'f1_score', 'auc_roc']
-    metric_names = ['Sensitivity', 'Specificity', 'F1-Score', 'AUC-ROC']
+    metrics = ['sensitivity', 'specificity', 'f1_score', 'auc_roc', 'qwk']
+    metric_names = ['Sensitivity', 'Specificity', 'F1-Score', 'AUC-ROC', 'Quadratic Weighted Kappa']
     class_names = ['Normal', 'Early AMD', 'Intermediate AMD', 'Advanced AMD']
     avg_types = ['micro', 'macro', 'weighted']
     
