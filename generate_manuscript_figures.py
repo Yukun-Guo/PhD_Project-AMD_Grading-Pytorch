@@ -47,8 +47,8 @@ class ManuscriptFigureGenerator:
         
         self.models = ['bio', 'oct', '3d']
         self.model_names = ['Biomarker', '2D OCT/OCTA', '3D OCT/OCTA']
-        self.class_names = ['Normal', 'Early\nAMD', 'Intermediate\nAMD', 'Advanced\nAMD']
-        self.class_names_full = ['Normal', 'Early AMD', 'Intermediate AMD', 'Advanced AMD']
+        self.class_names = ['No AMD', 'Early\nAMD', 'Intermediate\nAMD', 'Advanced\nAMD']
+        self.class_names_full = ['No AMD', 'Early AMD', 'Intermediate AMD', 'Advanced AMD']
         
         # Load analysis results
         self.load_results()

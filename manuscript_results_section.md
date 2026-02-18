@@ -78,6 +78,96 @@ Examinations were excluded if they exhibited:
 
 This study utilized de-identified retrospective imaging data collected as part of routine clinical care. Patient identifiers were removed prior to analysis, with only anonymized case identifiers retained for data tracking purposes. All procedures adhered to the tenets of the Declaration of Helsinki for human subjects research. Given the retrospective nature and use of de-identified data, formal institutional review board approval and informed consent requirements were waived in accordance with local regulations.
 
+### 2.6 Evaluation Methods
+
+Model performance was evaluated using multiple complementary metrics computed through a rigorous cross-validation framework. All metrics were calculated using macro-averaging across the four AMD severity classes (Normal, Early AMD, Intermediate AMD, Advanced AMD), followed by averaging across the 5 cross-validation folds. This two-stage aggregation approach ensures equal weighting of all disease classes regardless of their prevalence in the dataset, which is critical given the substantial class imbalance (7.2% Normal, 3.7% Early AMD, 37.2% Intermediate AMD, 51.8% Advanced AMD).
+
+#### 2.6.1 Macro-Averaging Procedure
+
+For each cross-validation fold *k* (where *k* = 1, 2, ..., 5):
+
+1. **Per-Class Metric Calculation**: For each AMD severity class *c* ∈ {Normal, Early, Intermediate, Advanced}, compute the class-specific metric *M<sub>c,k</sub>* using the test set predictions from fold *k*.
+
+2. **Macro-Average Across Classes**: Compute the fold-level macro-averaged metric as:
+
+   $$M_k^{macro} = \frac{1}{4} \sum_{c=1}^{4} M_{c,k}$$
+
+   where the sum is over all four AMD classes, ensuring equal contribution from each class regardless of sample size.
+
+3. **Cross-Fold Aggregation**: Compute the overall mean and standard deviation across all 5 folds:
+
+   $$\bar{M}^{macro} = \frac{1}{5} \sum_{k=1}^{5} M_k^{macro}$$
+
+   $$\sigma_M^{macro} = \sqrt{\frac{1}{4} \sum_{k=1}^{5} (M_k^{macro} - \bar{M}^{macro})^2}$$
+
+**Critical Note on Standard Deviation**: The standard deviations reported throughout this study (e.g., ±0.01 to ±0.14 in macro-averaged metrics) represent **inter-fold variability**, computed across the 5 macro-averaged fold-level metrics using the unbiased sample standard deviation formula above (with *n*-1 = 4 degrees of freedom). These standard deviations quantify the stability and generalization capability of each model architecture across different data partitions, NOT the variability across severity classes within a single fold.
+
+#### 2.6.2 Performance Metric Definitions
+
+For each AMD class *c* and fold *k*, the following metrics were computed from the confusion matrix elements:
+
+- **TP<sub>c,k</sub>** (True Positives): correctly predicted as class *c*
+- **TN<sub>c,k</sub>** (True Negatives): correctly predicted as not class *c* 
+- **FP<sub>c,k</sub>** (False Positives): incorrectly predicted as class *c*
+- **FN<sub>c,k</sub>** (False Negatives): incorrectly predicted as not class *c* when true class is *c*
+
+**1. Sensitivity (Recall, True Positive Rate)**
+
+Measures the proportion of actual positive cases correctly identified:
+
+$$\text{Sensitivity}_{c,k} = \frac{TP_{c,k}}{TP_{c,k} + FN_{c,k}}$$
+
+For multi-class classification, this represents the per-class recall, with macro-average sensitivity computed as the arithmetic mean across all four AMD classes. Sensitivity is particularly important in clinical settings to minimize false negatives (missed diagnoses).
+
+**2. Specificity (True Negative Rate)**
+
+Measures the proportion of actual negative cases correctly identified:
+
+$$\text{Specificity}_{c,k} = \frac{TN_{c,k}}{TN_{c,k} + FP_{c,k}}$$
+
+In the one-vs-rest framework for each class *c*, specificity quantifies the model's ability to correctly reject samples from the three other AMD classes. High specificity is crucial for reducing false positive diagnoses and unnecessary interventions.
+
+**3. F1-Score (Harmonic Mean of Precision and Recall)**
+
+Balances precision and recall into a single metric, particularly valuable for imbalanced datasets:
+
+$$\text{F1}_{c,k} = 2 \cdot \frac{\text{Precision}_{c,k} \times \text{Sensitivity}_{c,k}}{\text{Precision}_{c,k} + \text{Sensitivity}_{c,k}} = \frac{2 \cdot TP_{c,k}}{2 \cdot TP_{c,k} + FP_{c,k} + FN_{c,k}}$$
+
+where Precision<sub>c,k</sub> = TP<sub>c,k</sub> / (TP<sub>c,k</sub> + FP<sub>c,k</sub>). The F1-score penalizes models with either low precision (excessive false positives) or low sensitivity (excessive false negatives), making it particularly suitable for evaluating classification performance on minority classes like Early AMD.
+
+**4. AUC-ROC (Area Under the Receiver Operating Characteristic Curve)**
+
+Quantifies the model's discriminative ability across all possible classification thresholds by plotting True Positive Rate (Sensitivity) against False Positive Rate (1 - Specificity):
+
+$$\text{AUC-ROC}_{c,k} = \int_0^1 TPR(\tau) \, d(FPR(\tau))$$
+
+where *τ* represents the classification threshold, and TPR(*τ*) and FPR(*τ*) are the true positive and false positive rates at threshold *τ*. In practice, AUC-ROC is computed using the trapezoidal rule over all unique predicted probability values. For multi-class problems, we employ the one-vs-rest approach: for each class *c*, we compute the AUC-ROC by treating class *c* as the positive class and all other classes as negative. The macro-averaged AUC-ROC is the arithmetic mean of the four class-specific AUC-ROC values. AUC-ROC = 0.5 indicates no discriminative ability (random guessing), while AUC-ROC = 1.0 indicates perfect classification.
+
+**5. Quadratic Weighted Kappa (QWK)**
+
+Measures agreement between predicted and true labels while accounting for the ordinal nature of AMD severity grades and weighting disagreements quadratically by their distance:
+
+$$QWK_k = 1 - \frac{\sum_{i=1}^{4} \sum_{j=1}^{4} w_{ij} O_{ij}}{\sum_{i=1}^{4} \sum_{j=1}^{4} w_{ij} E_{ij}}$$
+
+where:
+- *O<sub>ij</sub>* is the observed count of samples with true class *i* predicted as class *j* (from the confusion matrix)
+- *E<sub>ij</sub>* is the expected count under chance agreement: *E<sub>ij</sub>* = (*n<sub>i</sub>* × *m<sub>j</sub>*) / *N*, with *n<sub>i</sub>* = total samples of true class *i*, *m<sub>j</sub>* = total predictions as class *j*, and *N* = total samples
+- *w<sub>ij</sub>* is the quadratic weight: *w<sub>ij</sub>* = (*i* - *j*)² / (*C* - 1)², where *C* = 4 (number of classes)
+
+QWK ranges from -1 (complete disagreement) to 1 (perfect agreement), with 0 indicating chance-level agreement. The quadratic weighting scheme heavily penalizes large classification errors (e.g., misclassifying Normal as Advanced AMD receives weight (0-3)²/3² = 1.0) while being more tolerant of adjacent misclassifications (e.g., Early vs. Intermediate AMD receives weight (1-2)²/3² = 0.11). This makes QWK particularly appropriate for ordinal AMD severity grading, where clinical consequences of misclassification increase with distance between predicted and true severity levels.
+
+#### 2.6.3 Interpretation of Standard Deviations
+
+The reported standard deviations provide crucial information about model stability:
+
+- **Small standard deviations** (e.g., ±0.01 for AUC-ROC or Specificity) indicate consistent performance across different data partitions, suggesting robust learned representations that generalize well.
+
+- **Moderate standard deviations** (e.g., ±0.05 for F1-score or Sensitivity) reflect some sensitivity to the specific composition of training/validation/test splits within each fold, which is expected given class imbalance and the finite dataset size.
+
+- **Large standard deviations** (e.g., ±0.14 for some metrics) suggest greater variability in performance across folds, potentially indicating challenges in learning stable representations from limited training data or heightened sensitivity to the specific sample composition in minority classes (particularly Early AMD with only ~13 training samples per fold).
+
+The standard deviation magnitudes are influenced by: (1) inherent model stability and generalization capability, (2) random variation in fold composition due to stratified sampling, (3) class imbalance effects on macro-averaging (minority classes with few samples contribute equally to the macro-average despite higher measurement uncertainty), and (4) the challenge of learning discriminative features for subtle disease stages like Early AMD with limited training examples.
+
 ---
 
 ## 3. Results
@@ -100,7 +190,7 @@ Table 1 presents the overall performance metrics averaged across all 5 folds for
 | 2D OCT/OCTA    | 0.94 ± 0.02     | 0.74 ± 0.06     | 0.83 ± 0.04     | 0.73 ± 0.07     | 0.92 ± 0.01     |
 | 3D OCT/OCTA    | 0.95 ± 0.02     | 0.72 ± 0.14     | 0.83 ± 0.09     | 0.71 ± 0.14     | 0.93 ± 0.03     |
 
-*Note: Values represent mean ± standard deviation across 5 folds. AUC-ROC: Area Under the Receiver Operating Characteristic Curve; QWK: Quadratic Weighted Kappa.*
+*Note: Values represent mean ± standard deviation across 5 folds. Detailed metric calculation formulas and standard deviation interpretation are provided in Section 2.6 (Evaluation Methods). AUC-ROC: Area Under the Receiver Operating Characteristic Curve; QWK: Quadratic Weighted Kappa.*
 
 The high specificity values (0.92-0.93) across all models indicate excellent ability to correctly identify negative cases, which is crucial for reducing false positive diagnoses in clinical settings. The quadratic weighted kappa scores, ranging from 0.83 to 0.85, demonstrate substantial agreement with ground truth labels while accounting for the ordinal nature of AMD severity grades.
 
